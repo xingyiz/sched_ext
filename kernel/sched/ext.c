@@ -7,23 +7,25 @@
  * Copyright (c) 2022 David Vernet <dvernet@meta.com>
  */
 #include <linux/btf.h>
+#include <linux/kprobes.h>
 
-#define SCX_OP_IDX(op)		(offsetof(struct sched_ext_ops, op) / sizeof(void (*)(void)))
+#define SCX_OP_IDX(op) \
+	(offsetof(struct sched_ext_ops, op) / sizeof(void (*)(void)))
 
 enum scx_internal_consts {
-	SCX_OPI_BEGIN			= 0,
-	SCX_OPI_NORMAL_BEGIN		= 0,
-	SCX_OPI_NORMAL_END		= SCX_OP_IDX(cpu_online),
-	SCX_OPI_CPU_HOTPLUG_BEGIN	= SCX_OP_IDX(cpu_online),
-	SCX_OPI_CPU_HOTPLUG_END		= SCX_OP_IDX(init),
-	SCX_OPI_END			= SCX_OP_IDX(init),
-	SCX_DSP_DFL_MAX_BATCH		= 32,
-	SCX_DSP_MAX_LOOPS		= 32,
-	SCX_WATCHDOG_MAX_TIMEOUT	= 30 * HZ,
+	SCX_OPI_BEGIN = 0,
+	SCX_OPI_NORMAL_BEGIN = 0,
+	SCX_OPI_NORMAL_END = SCX_OP_IDX(cpu_online),
+	SCX_OPI_CPU_HOTPLUG_BEGIN = SCX_OP_IDX(cpu_online),
+	SCX_OPI_CPU_HOTPLUG_END = SCX_OP_IDX(init),
+	SCX_OPI_END = SCX_OP_IDX(init),
+	SCX_DSP_DFL_MAX_BATCH = 32,
+	SCX_DSP_MAX_LOOPS = 32,
+	SCX_WATCHDOG_MAX_TIMEOUT = 30 * HZ,
 
-	SCX_EXIT_BT_LEN			= 64,
-	SCX_EXIT_MSG_LEN		= 1024,
-	SCX_EXIT_DUMP_LEN		= 32768,
+	SCX_EXIT_BT_LEN = 64,
+	SCX_EXIT_MSG_LEN = 1024,
+	SCX_EXIT_DUMP_LEN = 32768,
 };
 
 enum scx_ops_enable_state {
@@ -35,11 +37,9 @@ enum scx_ops_enable_state {
 };
 
 static const char *scx_ops_enable_state_str[] = {
-	[SCX_OPS_PREPPING]	= "prepping",
-	[SCX_OPS_ENABLING]	= "enabling",
-	[SCX_OPS_ENABLED]	= "enabled",
-	[SCX_OPS_DISABLING]	= "disabling",
-	[SCX_OPS_DISABLED]	= "disabled",
+	[SCX_OPS_PREPPING] = "prepping", [SCX_OPS_ENABLING] = "enabling",
+	[SCX_OPS_ENABLED] = "enabled",	 [SCX_OPS_DISABLING] = "disabling",
+	[SCX_OPS_DISABLED] = "disabled",
 };
 
 /*
@@ -65,10 +65,10 @@ static const char *scx_ops_enable_state_str[] = {
  * can safely reject invalid dispatches.
  */
 enum scx_ops_state {
-	SCX_OPSS_NONE,		/* owned by the SCX core */
-	SCX_OPSS_QUEUEING,	/* in transit to the BPF scheduler */
-	SCX_OPSS_QUEUED,	/* owned by the BPF scheduler */
-	SCX_OPSS_DISPATCHING,	/* in transit back to the SCX core */
+	SCX_OPSS_NONE, /* owned by the SCX core */
+	SCX_OPSS_QUEUEING, /* in transit to the BPF scheduler */
+	SCX_OPSS_QUEUED, /* owned by the BPF scheduler */
+	SCX_OPSS_DISPATCHING, /* in transit back to the SCX core */
 
 	/*
 	 * QSEQ brands each QUEUED instance so that, when dispatch races
@@ -80,12 +80,12 @@ enum scx_ops_state {
 	 * 32bit machines. The dispatch race window QSEQ protects is very narrow
 	 * and runs with IRQ disabled. 30 bits should be sufficient.
 	 */
-	SCX_OPSS_QSEQ_SHIFT	= 2,
+	SCX_OPSS_QSEQ_SHIFT = 2,
 };
 
 /* Use macros to ensure that the type is unsigned long for the masks */
-#define SCX_OPSS_STATE_MASK	((1LU << SCX_OPSS_QSEQ_SHIFT) - 1)
-#define SCX_OPSS_QSEQ_MASK	(~SCX_OPSS_STATE_MASK)
+#define SCX_OPSS_STATE_MASK ((1LU << SCX_OPSS_QSEQ_SHIFT) - 1)
+#define SCX_OPSS_QSEQ_MASK (~SCX_OPSS_STATE_MASK)
 
 /*
  * During exit, a task may schedule after losing its PIDs. When disabling the
@@ -115,8 +115,9 @@ static DEFINE_STATIC_KEY_FALSE(scx_ops_enq_exiting);
 DEFINE_STATIC_KEY_FALSE(scx_ops_cpu_preempt);
 static DEFINE_STATIC_KEY_FALSE(scx_builtin_idle_enabled);
 
-struct static_key_false scx_has_op[SCX_OPI_END] =
-	{ [0 ... SCX_OPI_END-1] = STATIC_KEY_FALSE_INIT };
+struct static_key_false scx_has_op[SCX_OPI_END] = {
+	[0 ... SCX_OPI_END - 1] = STATIC_KEY_FALSE_INIT
+};
 
 static atomic_t scx_exit_kind = ATOMIC_INIT(SCX_EXIT_DONE);
 static struct scx_exit_info *scx_exit_info;
@@ -153,7 +154,7 @@ static struct {
 	cpumask_var_t smt;
 } idle_masks CL_ALIGNED_IF_ONSTACK;
 
-#endif	/* CONFIG_SMP */
+#endif /* CONFIG_SMP */
 
 /* for %SCX_KICK_WAIT */
 static unsigned long __percpu *scx_kick_cpus_pnt_seqs;
@@ -171,9 +172,9 @@ static DEFINE_PER_CPU(struct task_struct *, direct_dispatch_task);
 static struct scx_dispatch_q __cacheline_aligned_in_smp scx_dsq_global;
 
 static const struct rhashtable_params dsq_hash_params = {
-	.key_len		= 8,
-	.key_offset		= offsetof(struct scx_dispatch_q, id),
-	.head_offset		= offsetof(struct scx_dispatch_q, hash_node),
+	.key_len = 8,
+	.key_offset = offsetof(struct scx_dispatch_q, id),
+	.head_offset = offsetof(struct scx_dispatch_q, hash_node),
 };
 
 static struct rhashtable dsq_hash;
@@ -181,20 +182,20 @@ static LLIST_HEAD(dsqs_to_free);
 
 /* dispatch buf */
 struct scx_dsp_buf_ent {
-	struct task_struct	*task;
-	unsigned long		qseq;
-	u64			dsq_id;
-	u64			enq_flags;
+	struct task_struct *task;
+	unsigned long qseq;
+	u64 dsq_id;
+	u64 enq_flags;
 };
 
 static u32 scx_dsp_max_batch;
 static struct scx_dsp_buf_ent __percpu *scx_dsp_buf;
 
 struct scx_dsp_ctx {
-	struct rq		*rq;
-	struct rq_flags		*rf;
-	u32			buf_cursor;
-	u32			nr_tasks;
+	struct rq *rq;
+	struct rq_flags *rf;
+	u32 buf_cursor;
+	u32 nr_tasks;
 };
 
 static DEFINE_PER_CPU(struct scx_dsp_ctx, scx_dsp_ctx);
@@ -208,13 +209,13 @@ static void scx_bpf_dispatch(struct task_struct *p, u64 dsq_id, u64 slice,
 static void scx_bpf_kick_cpu(s32 cpu, u64 flags);
 
 struct scx_task_iter {
-	struct sched_ext_entity		cursor;
-	struct task_struct		*locked;
-	struct rq			*rq;
-	struct rq_flags			rf;
+	struct sched_ext_entity cursor;
+	struct task_struct *locked;
+	struct rq *rq;
+	struct rq_flags rf;
 };
 
-#define SCX_HAS_OP(op)	static_branch_likely(&scx_has_op[SCX_OP_IDX(op)])
+#define SCX_HAS_OP(op) static_branch_likely(&scx_has_op[SCX_OP_IDX(op)])
 
 static long jiffies_delta_msecs(unsigned long at, unsigned long now)
 {
@@ -259,29 +260,29 @@ static void scx_kf_disallow(u32 mask)
 	current->scx.kf_mask &= ~mask;
 }
 
-#define SCX_CALL_OP(mask, op, args...)						\
-do {										\
-	if (mask) {								\
-		scx_kf_allow(mask);						\
-		scx_ops.op(args);						\
-		scx_kf_disallow(mask);						\
-	} else {								\
-		scx_ops.op(args);						\
-	}									\
-} while (0)
+#define SCX_CALL_OP(mask, op, args...)         \
+	do {                                   \
+		if (mask) {                    \
+			scx_kf_allow(mask);    \
+			scx_ops.op(args);      \
+			scx_kf_disallow(mask); \
+		} else {                       \
+			scx_ops.op(args);      \
+		}                              \
+	} while (0)
 
-#define SCX_CALL_OP_RET(mask, op, args...)					\
-({										\
-	__typeof__(scx_ops.op(args)) __ret;					\
-	if (mask) {								\
-		scx_kf_allow(mask);						\
-		__ret = scx_ops.op(args);					\
-		scx_kf_disallow(mask);						\
-	} else {								\
-		__ret = scx_ops.op(args);					\
-	}									\
-	__ret;									\
-})
+#define SCX_CALL_OP_RET(mask, op, args...)          \
+	({                                          \
+		__typeof__(scx_ops.op(args)) __ret; \
+		if (mask) {                         \
+			scx_kf_allow(mask);         \
+			__ret = scx_ops.op(args);   \
+			scx_kf_disallow(mask);      \
+		} else {                            \
+			__ret = scx_ops.op(args);   \
+		}                                   \
+		__ret;                              \
+	})
 
 /*
  * Some kfuncs are allowed only on the tasks that are subjects of the
@@ -294,48 +295,50 @@ do {										\
  * scx_kf_allowed_on_arg_tasks() to test whether the invocation is allowed on
  * the specific task.
  */
-#define SCX_CALL_OP_TASK(mask, op, task, args...)				\
-do {										\
-	BUILD_BUG_ON((mask) & ~__SCX_KF_TERMINAL);				\
-	current->scx.kf_tasks[0] = task;					\
-	SCX_CALL_OP(mask, op, task, ##args);					\
-	current->scx.kf_tasks[0] = NULL;					\
-} while (0)
+#define SCX_CALL_OP_TASK(mask, op, task, args...)          \
+	do {                                               \
+		BUILD_BUG_ON((mask) & ~__SCX_KF_TERMINAL); \
+		current->scx.kf_tasks[0] = task;           \
+		SCX_CALL_OP(mask, op, task, ##args);       \
+		current->scx.kf_tasks[0] = NULL;           \
+	} while (0)
 
-#define SCX_CALL_OP_TASK_RET(mask, op, task, args...)				\
-({										\
-	__typeof__(scx_ops.op(task, ##args)) __ret;				\
-	BUILD_BUG_ON((mask) & ~__SCX_KF_TERMINAL);				\
-	current->scx.kf_tasks[0] = task;					\
-	__ret = SCX_CALL_OP_RET(mask, op, task, ##args);			\
-	current->scx.kf_tasks[0] = NULL;					\
-	__ret;									\
-})
+#define SCX_CALL_OP_TASK_RET(mask, op, task, args...)            \
+	({                                                       \
+		__typeof__(scx_ops.op(task, ##args)) __ret;      \
+		BUILD_BUG_ON((mask) & ~__SCX_KF_TERMINAL);       \
+		current->scx.kf_tasks[0] = task;                 \
+		__ret = SCX_CALL_OP_RET(mask, op, task, ##args); \
+		current->scx.kf_tasks[0] = NULL;                 \
+		__ret;                                           \
+	})
 
-#define SCX_CALL_OP_2TASKS_RET(mask, op, task0, task1, args...)			\
-({										\
-	__typeof__(scx_ops.op(task0, task1, ##args)) __ret;			\
-	BUILD_BUG_ON((mask) & ~__SCX_KF_TERMINAL);				\
-	current->scx.kf_tasks[0] = task0;					\
-	current->scx.kf_tasks[1] = task1;					\
-	__ret = SCX_CALL_OP_RET(mask, op, task0, task1, ##args);		\
-	current->scx.kf_tasks[0] = NULL;					\
-	current->scx.kf_tasks[1] = NULL;					\
-	__ret;									\
-})
+#define SCX_CALL_OP_2TASKS_RET(mask, op, task0, task1, args...)          \
+	({                                                               \
+		__typeof__(scx_ops.op(task0, task1, ##args)) __ret;      \
+		BUILD_BUG_ON((mask) & ~__SCX_KF_TERMINAL);               \
+		current->scx.kf_tasks[0] = task0;                        \
+		current->scx.kf_tasks[1] = task1;                        \
+		__ret = SCX_CALL_OP_RET(mask, op, task0, task1, ##args); \
+		current->scx.kf_tasks[0] = NULL;                         \
+		current->scx.kf_tasks[1] = NULL;                         \
+		__ret;                                                   \
+	})
 
 /* @mask is constant, always inline to cull unnecessary branches */
 static __always_inline bool scx_kf_allowed(u32 mask)
 {
 	if (unlikely(!(current->scx.kf_mask & mask))) {
-		scx_ops_error("kfunc with mask 0x%x called from an operation only allowing 0x%x",
-			      mask, current->scx.kf_mask);
+		scx_ops_error(
+			"kfunc with mask 0x%x called from an operation only allowing 0x%x",
+			mask, current->scx.kf_mask);
 		return false;
 	}
 
 	if (unlikely((mask & (SCX_KF_INIT | SCX_KF_SLEEPABLE)) &&
 		     in_interrupt())) {
-		scx_ops_error("sleepable kfunc called from non-sleepable context");
+		scx_ops_error(
+			"sleepable kfunc called from non-sleepable context");
 		return false;
 	}
 
@@ -345,9 +348,11 @@ static __always_inline bool scx_kf_allowed(u32 mask)
 	 * inside ops.dispatch(). We don't need to check the SCX_KF_SLEEPABLE
 	 * boundary thanks to the above in_interrupt() check.
 	 */
-	if (unlikely(highest_bit(mask) == SCX_KF_CPU_RELEASE &&
-		     (current->scx.kf_mask & higher_bits(SCX_KF_CPU_RELEASE)))) {
-		scx_ops_error("cpu_release kfunc called from a nested operation");
+	if (unlikely(
+		    highest_bit(mask) == SCX_KF_CPU_RELEASE &&
+		    (current->scx.kf_mask & higher_bits(SCX_KF_CPU_RELEASE)))) {
+		scx_ops_error(
+			"cpu_release kfunc called from a nested operation");
 		return false;
 	}
 
@@ -662,7 +667,8 @@ static void dispatch_enqueue(struct scx_dispatch_q *dsq, struct task_struct *p,
 	if (!is_local) {
 		raw_spin_lock(&dsq->lock);
 		if (unlikely(dsq->id == SCX_DSQ_INVALID)) {
-			scx_ops_error("attempting to dispatch to a destroyed dsq");
+			scx_ops_error(
+				"attempting to dispatch to a destroyed dsq");
 			/* fall back to the global dsq */
 			raw_spin_unlock(&dsq->lock);
 			dsq = &scx_dsq_global;
@@ -689,8 +695,9 @@ static void dispatch_enqueue(struct scx_dispatch_q *dsq, struct task_struct *p,
 			      scx_dsq_priq_less);
 		/* A DSQ should only be using either FIFO or PRIQ enqueuing. */
 		if (unlikely(!list_empty(&dsq->fifo)))
-			scx_ops_error("DSQ ID 0x%016llx already had FIFO-enqueued tasks",
-				      dsq->id);
+			scx_ops_error(
+				"DSQ ID 0x%016llx already had FIFO-enqueued tasks",
+				dsq->id);
 	} else {
 		if (enq_flags & (SCX_ENQ_HEAD | SCX_ENQ_PREEMPT))
 			list_add(&p->scx.dsq_node.fifo, &dsq->fifo);
@@ -698,8 +705,9 @@ static void dispatch_enqueue(struct scx_dispatch_q *dsq, struct task_struct *p,
 			list_add_tail(&p->scx.dsq_node.fifo, &dsq->fifo);
 		/* A DSQ should only be using either FIFO or PRIQ enqueuing. */
 		if (unlikely(rb_first_cached(&dsq->priq)))
-			scx_ops_error("DSQ ID 0x%016llx already had PRIQ-enqueued tasks",
-				      dsq->id);
+			scx_ops_error(
+				"DSQ ID 0x%016llx already had PRIQ-enqueued tasks",
+				dsq->id);
 	}
 	dsq->nr++;
 	p->scx.dsq = dsq;
@@ -730,8 +738,8 @@ static void dispatch_enqueue(struct scx_dispatch_q *dsq, struct task_struct *p,
 			preempt = true;
 		}
 
-		if (preempt || sched_class_above(&ext_sched_class,
-						 rq->curr->sched_class))
+		if (preempt ||
+		    sched_class_above(&ext_sched_class, rq->curr->sched_class))
 			resched_curr(rq);
 	} else {
 		raw_spin_unlock(&dsq->lock);
@@ -753,7 +761,7 @@ static void task_unlink_from_dsq(struct task_struct *p,
 static bool task_linked_on_dsq(struct task_struct *p)
 {
 	return !list_empty(&p->scx.dsq_node.fifo) ||
-		!RB_EMPTY_NODE(&p->scx.dsq_node.priq);
+	       !RB_EMPTY_NODE(&p->scx.dsq_node.priq);
 }
 
 static void dispatch_dequeue(struct scx_rq *scx_rq, struct task_struct *p)
@@ -823,8 +831,8 @@ static struct scx_dispatch_q *find_dsq_for_dispatch(struct rq *rq, u64 dsq_id,
 
 	dsq = find_non_local_dsq(dsq_id);
 	if (unlikely(!dsq)) {
-		scx_ops_error("non-existent DSQ 0x%llx for %s[%d]",
-			      dsq_id, p->comm, p->pid);
+		scx_ops_error("non-existent DSQ 0x%llx for %s[%d]", dsq_id,
+			      p->comm, p->pid);
 		return &scx_dsq_global;
 	}
 
@@ -848,9 +856,10 @@ static void mark_direct_dispatch(struct task_struct *ddsp_task,
 			scx_ops_error("%s[%d] already direct-dispatched",
 				      p->comm, p->pid);
 		else
-			scx_ops_error("scheduling for %s[%d] but trying to direct-dispatch %s[%d]",
-				      ddsp_task->comm, ddsp_task->pid,
-				      p->comm, p->pid);
+			scx_ops_error(
+				"scheduling for %s[%d] but trying to direct-dispatch %s[%d]",
+				ddsp_task->comm, ddsp_task->pid, p->comm,
+				p->pid);
 		return;
 	}
 
@@ -861,7 +870,8 @@ static void mark_direct_dispatch(struct task_struct *ddsp_task,
 	 * ops.select_cpu() to be on the target CPU and then %SCX_DSQ_LOCAL.
 	 */
 	if (unlikely((dsq_id & SCX_DSQ_LOCAL_ON) == SCX_DSQ_LOCAL_ON)) {
-		scx_ops_error("SCX_DSQ_LOCAL_ON can't be used for direct-dispatch");
+		scx_ops_error(
+			"SCX_DSQ_LOCAL_ON can't be used for direct-dispatch");
 		return;
 	}
 
@@ -975,7 +985,7 @@ local_norefill:
 	return;
 
 global:
-	touch_core_sched(rq, p);	/* see the comment in local: */
+	touch_core_sched(rq, p); /* see the comment in local: */
 	p->scx.slice = SCX_SLICE_DFL;
 	dispatch_enqueue(&scx_dsq_global, p, enq_flags);
 }
@@ -1008,7 +1018,8 @@ static void clr_task_runnable(struct task_struct *p, bool reset_runnable_at)
 		p->scx.flags |= SCX_TASK_RESET_RUNNABLE_AT;
 }
 
-static void enqueue_task_scx(struct rq *rq, struct task_struct *p, int enq_flags)
+static void enqueue_task_scx(struct rq *rq, struct task_struct *p,
+			     int enq_flags)
 {
 	int sticky_cpu = p->scx.sticky_cpu;
 
@@ -1092,7 +1103,8 @@ static void ops_dequeue(struct task_struct *p, u64 deq_flags)
 	}
 }
 
-static void dequeue_task_scx(struct rq *rq, struct task_struct *p, int deq_flags)
+static void dequeue_task_scx(struct rq *rq, struct task_struct *p,
+			     int deq_flags)
 {
 	struct scx_rq *scx_rq = &rq->scx;
 
@@ -1281,13 +1293,12 @@ static void dispatch_to_local_dsq_unlock(struct rq *rq, struct rq_flags *rf,
 		rq_repin_lock(rq, rf);
 	}
 }
-#endif	/* CONFIG_SMP */
-
+#endif /* CONFIG_SMP */
 
 static bool task_can_run_on_rq(struct task_struct *p, struct rq *rq)
 {
 	return likely(test_rq_online(rq)) && !is_migration_disabled(p) &&
-		cpumask_test_cpu(cpu_of(rq), p->cpus_ptr);
+	       cpumask_test_cpu(cpu_of(rq), p->cpus_ptr);
 }
 
 static bool consume_dispatch_q(struct rq *rq, struct rq_flags *rf,
@@ -1314,7 +1325,8 @@ retry:
 
 	for (rb_node = rb_first_cached(&dsq->priq); rb_node;
 	     rb_node = rb_next(rb_node)) {
-		p = container_of(rb_node, struct task_struct, scx.dsq_node.priq);
+		p = container_of(rb_node, struct task_struct,
+				 scx.dsq_node.priq);
 		task_rq = task_rq(p);
 		if (rq == task_rq)
 			goto this_rq;
@@ -1365,10 +1377,10 @@ remote_rq:
 }
 
 enum dispatch_to_local_dsq_ret {
-	DTL_DISPATCHED,		/* successfully dispatched */
-	DTL_LOST,		/* lost race to dequeue */
-	DTL_NOT_LOCAL,		/* destination is not a local DSQ */
-	DTL_INVALID,		/* invalid local dsq_id */
+	DTL_DISPATCHED, /* successfully dispatched */
+	DTL_LOST, /* lost race to dequeue */
+	DTL_NOT_LOCAL, /* destination is not a local DSQ */
+	DTL_INVALID, /* invalid local dsq_id */
 };
 
 /**
@@ -1403,8 +1415,9 @@ dispatch_to_local_dsq(struct rq *rq, struct rq_flags *rf, u64 dsq_id,
 		s32 cpu = dsq_id & SCX_DSQ_LOCAL_CPU_MASK;
 
 		if (!ops_cpu_valid(cpu)) {
-			scx_ops_error("invalid cpu %d in SCX_DSQ_LOCAL_ON verdict for %s[%d]",
-				      cpu, p->comm, p->pid);
+			scx_ops_error(
+				"invalid cpu %d in SCX_DSQ_LOCAL_ON verdict for %s[%d]",
+				cpu, p->comm, p->pid);
 			return DTL_INVALID;
 		}
 		dst_rq = cpu_rq(cpu);
@@ -1480,8 +1493,9 @@ dispatch_to_local_dsq(struct rq *rq, struct rq_flags *rf, u64 dsq_id,
 	}
 #endif /* CONFIG_SMP */
 
-	scx_ops_error("SCX_DSQ_LOCAL[_ON] verdict target cpu %d not allowed for %s[%d]",
-		      cpu_of(dst_rq), p->comm, p->pid);
+	scx_ops_error(
+		"SCX_DSQ_LOCAL[_ON] verdict target cpu %d not allowed for %s[%d]",
+		cpu_of(dst_rq), p->comm, p->pid);
 	return DTL_INVALID;
 }
 
@@ -1507,8 +1521,8 @@ dispatch_to_local_dsq(struct rq *rq, struct rq_flags *rf, u64 dsq_id,
  */
 static void finish_dispatch(struct rq *rq, struct rq_flags *rf,
 			    struct task_struct *p,
-			    unsigned long qseq_at_dispatch,
-			    u64 dsq_id, u64 enq_flags)
+			    unsigned long qseq_at_dispatch, u64 dsq_id,
+			    u64 enq_flags)
 {
 	struct scx_dispatch_q *dsq;
 	unsigned long opss;
@@ -1636,8 +1650,8 @@ static int balance_one(struct rq *rq, struct task_struct *prev,
 		 * %SCX_TASK_BAL_KEEP. Instead, pick_task_scx() will test the
 		 * same conditions later and pick @rq->curr accordingly.
 		 */
-		if ((prev->scx.flags & SCX_TASK_QUEUED) &&
-		    prev->scx.slice && !scx_ops_bypassing()) {
+		if ((prev->scx.flags & SCX_TASK_QUEUED) && prev->scx.slice &&
+		    !scx_ops_bypassing()) {
 			if (local)
 				prev->scx.flags |= SCX_TASK_BAL_KEEP;
 			goto has_tasks;
@@ -1880,8 +1894,10 @@ static struct task_struct *pick_next_task_scx(struct rq *rq)
 
 	if (unlikely(!p->scx.slice)) {
 		if (!scx_ops_bypassing() && !scx_warned_zero_slice) {
-			printk_deferred(KERN_WARNING "sched_ext: %s[%d] has zero slice in pick_next_task_scx()\n",
-					p->comm, p->pid);
+			printk_deferred(
+				KERN_WARNING
+				"sched_ext: %s[%d] has zero slice in pick_next_task_scx()\n",
+				p->comm, p->pid);
 			scx_warned_zero_slice = true;
 		}
 		p->scx.slice = SCX_SLICE_DFL;
@@ -1966,9 +1982,9 @@ static struct task_struct *pick_task_scx(struct rq *rq)
 			return curr;
 	}
 
-	return first;	/* this may be %NULL */
+	return first; /* this may be %NULL */
 }
-#endif	/* CONFIG_SCHED_CORE */
+#endif /* CONFIG_SCHED_CORE */
 
 static enum scx_cpu_preempt_reason
 preempt_reason_from_class(const struct sched_class *class)
@@ -2015,8 +2031,8 @@ void __scx_notify_pick_next_task(struct rq *rq, struct task_struct *task,
 				.task = task,
 			};
 
-			SCX_CALL_OP(SCX_KF_CPU_RELEASE,
-				    cpu_release, cpu_of(rq), &args);
+			SCX_CALL_OP(SCX_KF_CPU_RELEASE, cpu_release, cpu_of(rq),
+				    &args);
 		}
 		rq->scx.cpu_released = true;
 	}
@@ -2154,7 +2170,8 @@ __bpf_kfunc s32 scx_bpf_select_cpu_dfl(struct task_struct *p, s32 prev_cpu,
 
 __bpf_kfunc_end_defs();
 
-static int select_task_rq_scx(struct task_struct *p, int prev_cpu, int wake_flags)
+static int select_task_rq_scx(struct task_struct *p, int prev_cpu,
+			      int wake_flags)
 {
 	if (SCX_HAS_OP(select_cpu)) {
 		s32 cpu;
@@ -2170,7 +2187,8 @@ static int select_task_rq_scx(struct task_struct *p, int prev_cpu, int wake_flag
 		if (ops_cpu_valid(cpu)) {
 			return cpu;
 		} else {
-			scx_ops_error("select_cpu returned invalid cpu %d", cpu);
+			scx_ops_error("select_cpu returned invalid cpu %d",
+				      cpu);
 			return prev_cpu;
 		}
 	} else {
@@ -2261,9 +2279,17 @@ static void rq_offline_scx(struct rq *rq, enum rq_onoff_reason reason)
 
 #else /* !CONFIG_SMP */
 
-static bool test_and_clear_cpu_idle(int cpu) { return false; }
-static s32 scx_pick_idle_cpu(const struct cpumask *cpus_allowed, u64 flags) { return -EBUSY; }
-static void reset_idle_masks(void) {}
+static bool test_and_clear_cpu_idle(int cpu)
+{
+	return false;
+}
+static s32 scx_pick_idle_cpu(const struct cpumask *cpus_allowed, u64 flags)
+{
+	return -EBUSY;
+}
+static void reset_idle_masks(void)
+{
+}
 
 #endif /* CONFIG_SMP */
 
@@ -2277,14 +2303,14 @@ static bool check_rq_for_timeouts(struct rq *rq)
 	list_for_each_entry(p, &rq->scx.runnable_list, scx.runnable_node) {
 		unsigned long last_runnable = p->scx.runnable_at;
 
-		if (unlikely(time_after(jiffies,
-					last_runnable + scx_watchdog_timeout))) {
+		if (unlikely(time_after(
+			    jiffies, last_runnable + scx_watchdog_timeout))) {
 			u32 dur_ms = jiffies_to_msecs(jiffies - last_runnable);
 
 			scx_ops_error_kind(SCX_EXIT_ERROR_STALL,
 					   "%s[%d] failed to run for %u.%03us",
-					   p->comm, p->pid,
-					   dur_ms / 1000, dur_ms % 1000);
+					   p->comm, p->pid, dur_ms / 1000,
+					   dur_ms % 1000);
 			timed_out = true;
 			break;
 		}
@@ -2341,13 +2367,13 @@ static struct cgroup *tg_cgrp(struct task_group *tg)
 		return &cgrp_dfl_root.cgrp;
 }
 
-#define SCX_INIT_TASK_ARGS_CGROUP(tg)		.cgroup = tg_cgrp(tg),
+#define SCX_INIT_TASK_ARGS_CGROUP(tg) .cgroup = tg_cgrp(tg),
 
-#else	/* CONFIG_EXT_GROUP_SCHED */
+#else /* CONFIG_EXT_GROUP_SCHED */
 
 #define SCX_INIT_TASK_ARGS_CGROUP(tg)
 
-#endif	/* CONFIG_EXT_GROUP_SCHED */
+#endif /* CONFIG_EXT_GROUP_SCHED */
 
 static enum scx_task_state scx_get_task_state(const struct task_struct *p)
 {
@@ -2378,14 +2404,17 @@ static void scx_set_task_state(struct task_struct *p, enum scx_task_state state)
 		return;
 	}
 
-	WARN_ONCE(warn, "sched_ext: Invalid task state transition %d -> %d for %s[%d]",
-		  prev_state, state, p->comm, p->pid);
+	WARN_ONCE(
+		warn,
+		"sched_ext: Invalid task state transition %d -> %d for %s[%d]",
+		prev_state, state, p->comm, p->pid);
 
 	p->scx.flags &= ~SCX_TASK_STATE_MASK;
 	p->scx.flags |= state << SCX_TASK_STATE_SHIFT;
 }
 
-static int scx_ops_init_task(struct task_struct *p, struct task_group *tg, bool fork)
+static int scx_ops_init_task(struct task_struct *p, struct task_group *tg,
+			     bool fork)
 {
 	int ret;
 
@@ -2393,8 +2422,7 @@ static int scx_ops_init_task(struct task_struct *p, struct task_group *tg, bool 
 
 	if (SCX_HAS_OP(init_task)) {
 		struct scx_init_task_args args = {
-			SCX_INIT_TASK_ARGS_CGROUP(tg)
-			.fork = fork,
+			SCX_INIT_TASK_ARGS_CGROUP(tg).fork = fork,
 		};
 
 		ret = SCX_CALL_OP_RET(SCX_KF_SLEEPABLE, init_task, p, &args);
@@ -2607,8 +2635,13 @@ static void switched_from_scx(struct rq *rq, struct task_struct *p)
 	scx_ops_disable_task(p);
 }
 
-static void wakeup_preempt_scx(struct rq *rq, struct task_struct *p,int wake_flags) {}
-static void switched_to_scx(struct rq *rq, struct task_struct *p) {}
+static void wakeup_preempt_scx(struct rq *rq, struct task_struct *p,
+			       int wake_flags)
+{
+}
+static void switched_to_scx(struct rq *rq, struct task_struct *p)
+{
+}
 
 int scx_check_setscheduler(struct task_struct *p, int policy)
 {
@@ -2700,8 +2733,9 @@ int scx_cgroup_can_attach(struct cgroup_taskset *tset)
 		struct cgroup *from = tg_cgrp(task_group(p));
 
 		if (SCX_HAS_OP(cgroup_prep_move)) {
-			ret = SCX_CALL_OP_RET(SCX_KF_SLEEPABLE, cgroup_prep_move,
-					      p, from, css->cgroup);
+			ret = SCX_CALL_OP_RET(SCX_KF_SLEEPABLE,
+					      cgroup_prep_move, p, from,
+					      css->cgroup);
 			if (ret)
 				goto err;
 		}
@@ -2748,7 +2782,8 @@ void scx_move_task(struct task_struct *p)
 		if (WARN_ON_ONCE(!p->scx.cgrp_moving_from))
 			return;
 		SCX_CALL_OP_TASK(SCX_KF_UNLOCKED, cgroup_move, p,
-			p->scx.cgrp_moving_from, tg_cgrp(task_group(p)));
+				 p->scx.cgrp_moving_from,
+				 tg_cgrp(task_group(p)));
 	}
 	p->scx.cgrp_moving_from = NULL;
 }
@@ -2802,12 +2837,16 @@ static void scx_cgroup_unlock(void)
 	percpu_up_write(&scx_cgroup_rwsem);
 }
 
-#else	/* CONFIG_EXT_GROUP_SCHED */
+#else /* CONFIG_EXT_GROUP_SCHED */
 
-static inline void scx_cgroup_lock(void) {}
-static inline void scx_cgroup_unlock(void) {}
+static inline void scx_cgroup_lock(void)
+{
+}
+static inline void scx_cgroup_unlock(void)
+{
+}
 
-#endif	/* CONFIG_EXT_GROUP_SCHED */
+#endif /* CONFIG_EXT_GROUP_SCHED */
 
 /*
  * Omitted operations:
@@ -2824,43 +2863,43 @@ static inline void scx_cgroup_unlock(void) {}
  * - task_woken: Unnecessary.
  */
 DEFINE_SCHED_CLASS(ext) = {
-	.enqueue_task		= enqueue_task_scx,
-	.dequeue_task		= dequeue_task_scx,
-	.yield_task		= yield_task_scx,
-	.yield_to_task		= yield_to_task_scx,
+	.enqueue_task = enqueue_task_scx,
+	.dequeue_task = dequeue_task_scx,
+	.yield_task = yield_task_scx,
+	.yield_to_task = yield_to_task_scx,
 
-	.wakeup_preempt		= wakeup_preempt_scx,
+	.wakeup_preempt = wakeup_preempt_scx,
 
-	.pick_next_task		= pick_next_task_scx,
+	.pick_next_task = pick_next_task_scx,
 
-	.put_prev_task		= put_prev_task_scx,
-	.set_next_task          = set_next_task_scx,
+	.put_prev_task = put_prev_task_scx,
+	.set_next_task = set_next_task_scx,
 
 #ifdef CONFIG_SMP
-	.balance		= balance_scx,
-	.select_task_rq		= select_task_rq_scx,
-	.set_cpus_allowed	= set_cpus_allowed_scx,
+	.balance = balance_scx,
+	.select_task_rq = select_task_rq_scx,
+	.set_cpus_allowed = set_cpus_allowed_scx,
 
-	.rq_online		= rq_online_scx,
-	.rq_offline		= rq_offline_scx,
+	.rq_online = rq_online_scx,
+	.rq_offline = rq_offline_scx,
 #endif
 
 #ifdef CONFIG_SCHED_CORE
-	.pick_task		= pick_task_scx,
+	.pick_task = pick_task_scx,
 #endif
 
-	.task_tick		= task_tick_scx,
+	.task_tick = task_tick_scx,
 
-	.switching_to		= switching_to_scx,
-	.switched_from		= switched_from_scx,
-	.switched_to		= switched_to_scx,
-	.reweight_task		= reweight_task_scx,
-	.prio_changed		= prio_changed_scx,
+	.switching_to = switching_to_scx,
+	.switched_from = switched_from_scx,
+	.switched_to = switched_to_scx,
+	.reweight_task = reweight_task_scx,
+	.prio_changed = prio_changed_scx,
 
-	.update_curr		= update_curr_scx,
+	.update_curr = update_curr_scx,
 
 #ifdef CONFIG_UCLAMP_TASK
-	.uclamp_enabled		= 0,
+	.uclamp_enabled = 0,
 #endif
 };
 
@@ -2921,8 +2960,9 @@ static void destroy_dsq(u64 dsq_id)
 	raw_spin_lock_irqsave(&dsq->lock, flags);
 
 	if (dsq->nr) {
-		scx_ops_error("attempting to destroy in-use dsq 0x%016llx (nr=%u)",
-			      dsq->id, dsq->nr);
+		scx_ops_error(
+			"attempting to destroy in-use dsq 0x%016llx (nr=%u)",
+			dsq->id, dsq->nr);
 		goto out_unlock_dsq;
 	}
 
@@ -2995,8 +3035,8 @@ static int scx_cgroup_init(void)
 		struct task_group *tg = css_tg(css);
 		struct scx_cgroup_init_args args = { .weight = tg->scx_weight };
 
-		if ((tg->scx_flags &
-		     (SCX_TG_ONLINE | SCX_TG_INITED)) != SCX_TG_ONLINE)
+		if ((tg->scx_flags & (SCX_TG_ONLINE | SCX_TG_INITED)) !=
+		    SCX_TG_ONLINE)
 			continue;
 
 		if (!scx_ops.cgroup_init) {
@@ -3027,7 +3067,7 @@ static int scx_cgroup_init(void)
 static void scx_cgroup_config_knobs(void)
 {
 	static DEFINE_MUTEX(cgintf_mutex);
-	DECLARE_BITMAP(mask, CPU_CFTYPE_CNT) = { };
+	DECLARE_BITMAP(mask, CPU_CFTYPE_CNT) = {};
 	u64 knob_flags;
 	int i;
 
@@ -3065,20 +3105,26 @@ apply:
 }
 
 #else
-static void scx_cgroup_exit(void) {}
-static int scx_cgroup_init(void) { return 0; }
-static void scx_cgroup_config_knobs(void) {}
+static void scx_cgroup_exit(void)
+{
+}
+static int scx_cgroup_init(void)
+{
+	return 0;
+}
+static void scx_cgroup_config_knobs(void)
+{
+}
 #endif
-
 
 /********************************************************************************
  * Sysfs interface and ops enable/disable.
  */
 
-#define SCX_ATTR(_name)								\
-	static struct kobj_attribute scx_attr_##_name = {			\
-		.attr = { .name = __stringify(_name), .mode = 0444 },		\
-		.show = scx_attr_##_name##_show,				\
+#define SCX_ATTR(_name)                                               \
+	static struct kobj_attribute scx_attr_##_name = {             \
+		.attr = { .name = __stringify(_name), .mode = 0444 }, \
+		.show = scx_attr_##_name##_show,                      \
 	}
 
 static ssize_t scx_attr_state_show(struct kobject *kobj,
@@ -3232,7 +3278,8 @@ static void scx_ops_bypass(bool bypass)
 			struct sched_enq_and_set_ctx ctx;
 
 			/* cycling deq/enq is enough, see the function comment */
-			sched_deq_and_put_task(p, DEQUEUE_SAVE | DEQUEUE_MOVE, &ctx);
+			sched_deq_and_put_task(p, DEQUEUE_SAVE | DEQUEUE_MOVE,
+					       &ctx);
 			sched_enq_and_set_task(&ctx);
 		}
 
@@ -3385,12 +3432,15 @@ static void scx_ops_disable_workfn(struct kthread_work *work)
 	percpu_up_write(&scx_fork_rwsem);
 
 	if (ei->kind >= SCX_EXIT_ERROR) {
-		printk(KERN_ERR "sched_ext: BPF scheduler \"%s\" errored, disabling\n", scx_ops.name);
+		printk(KERN_ERR
+		       "sched_ext: BPF scheduler \"%s\" errored, disabling\n",
+		       scx_ops.name);
 
 		if (ei->msg[0] == '\0')
 			printk(KERN_ERR "sched_ext: %s\n", ei->reason);
 		else
-			printk(KERN_ERR "sched_ext: %s (%s)\n", ei->reason, ei->msg);
+			printk(KERN_ERR "sched_ext: %s (%s)\n", ei->reason,
+			       ei->msg);
 
 		stack_trace_print(ei->bt, ei->bt_len, 2);
 	}
@@ -3479,15 +3529,15 @@ static void scx_dump_task(struct seq_buf *s, struct task_struct *p, char marker,
 		scnprintf(dsq_id_buf, sizeof(dsq_id_buf), "0x%llx",
 			  (unsigned long long)p->scx.dsq->id);
 
-	seq_buf_printf(s, "\n %c%c %s[%d] %+ldms\n",
-		       marker, task_state_to_char(p), p->comm, p->pid,
+	seq_buf_printf(s, "\n %c%c %s[%d] %+ldms\n", marker,
+		       task_state_to_char(p), p->comm, p->pid,
 		       jiffies_delta_msecs(p->scx.runnable_at, now));
-	seq_buf_printf(s, "      scx_state/flags=%u/0x%x dsq_flags=0x%x ops_state/qseq=%lu/%lu\n",
-		       scx_get_task_state(p),
-		       p->scx.flags & ~SCX_TASK_STATE_MASK,
-		       p->scx.dsq_flags,
-		       ops_state & SCX_OPSS_STATE_MASK,
-		       ops_state >> SCX_OPSS_QSEQ_SHIFT);
+	seq_buf_printf(
+		s,
+		"      scx_state/flags=%u/0x%x dsq_flags=0x%x ops_state/qseq=%lu/%lu\n",
+		scx_get_task_state(p), p->scx.flags & ~SCX_TASK_STATE_MASK,
+		p->scx.dsq_flags, ops_state & SCX_OPSS_STATE_MASK,
+		ops_state >> SCX_OPSS_QSEQ_SHIFT);
 	seq_buf_printf(s, "      sticky/holding_cpu=%d/%d dsq_id=%s\n",
 		       p->scx.sticky_cpu, p->scx.holding_cpu, dsq_id_buf);
 	seq_buf_printf(s, "      cpus=%*pb\n\n", cpumask_pr_args(p->cpus_ptr));
@@ -3511,7 +3561,8 @@ static void scx_dump_state(struct scx_exit_info *ei)
 	seq_buf_init(&s, ei->dump, SCX_EXIT_DUMP_LEN - sizeof(trunc_marker));
 
 	seq_buf_printf(&s, "%s[%d] triggered exit kind %d:\n  %s (%s)\n\n",
-		       current->comm, current->pid, ei->kind, ei->reason, ei->msg);
+		       current->comm, current->pid, ei->kind, ei->reason,
+		       ei->msg);
 	seq_buf_printf(&s, "Backtrace:\n");
 	avail = seq_buf_get_buf(&s, &buf);
 	used = stack_trace_snprint(buf, avail, ei->bt, ei->bt_len, 1);
@@ -3531,10 +3582,12 @@ static void scx_dump_state(struct scx_exit_info *ei)
 		    rq->curr->sched_class == &idle_sched_class)
 			goto next;
 
-		seq_buf_printf(&s, "\nCPU %-4d: nr_run=%u flags=0x%x cpu_rel=%d ops_qseq=%lu pnt_seq=%lu\n",
-			       cpu, rq->scx.nr_running, rq->scx.flags,
-			       rq->scx.cpu_released, rq->scx.ops_qseq,
-			       rq->scx.pnt_seq);
+		seq_buf_printf(
+			&s,
+			"\nCPU %-4d: nr_run=%u flags=0x%x cpu_rel=%d ops_qseq=%lu pnt_seq=%lu\n",
+			cpu, rq->scx.nr_running, rq->scx.flags,
+			rq->scx.cpu_released, rq->scx.ops_qseq,
+			rq->scx.pnt_seq);
 		seq_buf_printf(&s, "          curr=%s[%d] class=%ps\n",
 			       rq->curr->comm, rq->curr->pid,
 			       rq->curr->sched_class);
@@ -3542,8 +3595,9 @@ static void scx_dump_state(struct scx_exit_info *ei)
 			seq_buf_printf(&s, "  cpus_to_kick   : %*pb\n",
 				       cpumask_pr_args(rq->scx.cpus_to_kick));
 		if (!cpumask_empty(rq->scx.cpus_to_preempt))
-			seq_buf_printf(&s, "  cpus_to_preempt: %*pb\n",
-				       cpumask_pr_args(rq->scx.cpus_to_preempt));
+			seq_buf_printf(
+				&s, "  cpus_to_preempt: %*pb\n",
+				cpumask_pr_args(rq->scx.cpus_to_preempt));
 		if (!cpumask_empty(rq->scx.cpus_to_wait))
 			seq_buf_printf(&s, "  cpus_to_wait   : %*pb\n",
 				       cpumask_pr_args(rq->scx.cpus_to_wait));
@@ -3551,9 +3605,10 @@ static void scx_dump_state(struct scx_exit_info *ei)
 		if (rq->curr->sched_class == &ext_sched_class)
 			scx_dump_task(&s, rq->curr, '*', now);
 
-		list_for_each_entry(p, &rq->scx.runnable_list, scx.runnable_node)
+		list_for_each_entry(p, &rq->scx.runnable_list,
+				    scx.runnable_node)
 			scx_dump_task(&s, p, ' ', now);
-	next:
+next:
 		rq_unlock(rq, &rf);
 	}
 
@@ -3571,8 +3626,8 @@ static void scx_ops_error_irq_workfn(struct irq_work *irq_work)
 
 static DEFINE_IRQ_WORK(scx_ops_error_irq_work, scx_ops_error_irq_workfn);
 
-__printf(2, 3) void scx_ops_error_kind(enum scx_exit_kind kind,
-				       const char *fmt, ...)
+__printf(2, 3) void scx_ops_error_kind(enum scx_exit_kind kind, const char *fmt,
+				       ...)
 {
 	struct scx_exit_info *ei = scx_exit_info;
 	int none = SCX_EXIT_NONE;
@@ -3614,7 +3669,8 @@ static int validate_ops(const struct sched_ext_ops *ops)
 	 * ops.enqueue() callback isn't implemented.
 	 */
 	if ((ops->flags & SCX_OPS_ENQ_LAST) && !ops->enqueue) {
-		scx_ops_error("SCX_OPS_ENQ_LAST requires ops.enqueue() to be implemented");
+		scx_ops_error(
+			"SCX_OPS_ENQ_LAST requires ops.enqueue() to be implemented");
 		return -EINVAL;
 	}
 
@@ -3901,7 +3957,6 @@ err_disable:
 	return ret;
 }
 
-
 /********************************************************************************
  * bpf_struct_ops plumbing.
  */
@@ -3914,31 +3969,31 @@ static u32 task_struct_type_id;
 
 /* Make the 2nd argument of .dispatch a pointer that can be NULL. */
 static bool promote_dispatch_2nd_arg(int off, int size,
-                                     enum bpf_access_type type,
-                                     const struct bpf_prog *prog,
-                                     struct bpf_insn_access_aux *info)
+				     enum bpf_access_type type,
+				     const struct bpf_prog *prog,
+				     struct bpf_insn_access_aux *info)
 {
 	struct btf *btf = bpf_get_btf_vmlinux();
 	const struct bpf_struct_ops_desc *st_ops_desc;
 	const struct btf_member *member;
-        const struct btf_type *t;
-        u32 btf_id, member_idx;
+	const struct btf_type *t;
+	u32 btf_id, member_idx;
 	const char *mname;
 
-        /* btf_id should be the type id of struct sched_ext_ops */
+	/* btf_id should be the type id of struct sched_ext_ops */
 	btf_id = prog->aux->attach_btf_id;
 	st_ops_desc = bpf_struct_ops_find(btf, btf_id);
 	if (!st_ops_desc)
-                return false;
+		return false;
 
-        /* BTF type of struct sched_ext_ops */
-        t = st_ops_desc->type;
+	/* BTF type of struct sched_ext_ops */
+	t = st_ops_desc->type;
 
 	member_idx = prog->expected_attach_type;
 	if (member_idx >= btf_type_vlen(t))
-                return false;
+		return false;
 
-        /*
+	/*
 	 * Get the member name of this struct_ops program, which corresponds to
 	 * a field in struct sched_ext_ops. For example, the member name of the
 	 * dispatch struct_ops program (callback) is "dispatch".
@@ -3946,15 +4001,14 @@ static bool promote_dispatch_2nd_arg(int off, int size,
 	member = &btf_type_member(t)[member_idx];
 	mname = btf_name_by_offset(btf_vmlinux, member->name_off);
 
-        /*
+	/*
 	 * Check if it is the second argument of the function pointer at
 	 * "dispatch" in struct sched_ext_ops. The arguments of struct_ops
 	 * operators are sequential and 64-bit, so the second argument is at
 	 * offset sizeof(__u64).
          */
-        if (strcmp(mname, "dispatch") == 0 &&
-            off == sizeof(__u64)) {
-                /*
+	if (strcmp(mname, "dispatch") == 0 && off == sizeof(__u64)) {
+		/*
 		 * The value is a pointer to a type (struct task_struct) given
 		 * by a BTF ID (PTR_TO_BTF_ID). It is trusted (PTR_TRUSTED),
 		 * however, can be a NULL (PTR_MAYBE_NULL). The BPF program
@@ -3964,15 +4018,14 @@ static bool promote_dispatch_2nd_arg(int off, int size,
 		 * Longer term, this is something that should be addressed by
 		 * BTF, and be fully contained within the verifier.
                  */
-                info->reg_type = PTR_MAYBE_NULL | PTR_TO_BTF_ID |
-                  PTR_TRUSTED;
-                info->btf = btf_vmlinux;
-                info->btf_id = task_struct_type_id;
+		info->reg_type = PTR_MAYBE_NULL | PTR_TO_BTF_ID | PTR_TRUSTED;
+		info->btf = btf_vmlinux;
+		info->btf_id = task_struct_type_id;
 
-                return true;
-        }
+		return true;
+	}
 
-        return false;
+	return false;
 }
 
 static bool bpf_scx_is_valid_access(int off, int size,
@@ -3982,8 +4035,8 @@ static bool bpf_scx_is_valid_access(int off, int size,
 {
 	if (type != BPF_READ)
 		return false;
-        if (promote_dispatch_2nd_arg(off, size, type, prog, info))
-                return true;
+	if (promote_dispatch_2nd_arg(off, size, type, prog, info))
+		return true;
 	if (off < 0 || off >= sizeof(__u64) * MAX_BPF_FUNC_ARGS)
 		return false;
 	if (off % size != 0)
@@ -4004,7 +4057,8 @@ static int bpf_scx_btf_struct_access(struct bpf_verifier_log *log,
 		    off + size <= offsetofend(struct task_struct, scx.slice))
 			return SCALAR_VALUE;
 		if (off >= offsetof(struct task_struct, scx.dsq_vtime) &&
-		    off + size <= offsetofend(struct task_struct, scx.dsq_vtime))
+		    off + size <=
+			    offsetofend(struct task_struct, scx.dsq_vtime))
 			return SCALAR_VALUE;
 		if (off >= offsetof(struct task_struct, scx.disallow) &&
 		    off + size <= offsetofend(struct task_struct, scx.disallow))
@@ -4022,6 +4076,8 @@ bpf_scx_get_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_task_storage_get_proto;
 	case BPF_FUNC_task_storage_delete:
 		return &bpf_task_storage_delete_proto;
+	case BPF_FUNC_schedule:
+		return &bpf_schedule_proto;
 	default:
 		return bpf_base_func_proto(func_id, prog);
 	}
@@ -4034,8 +4090,8 @@ const struct bpf_verifier_ops bpf_scx_verifier_ops = {
 };
 
 static int bpf_scx_init_member(const struct btf_type *t,
-			       const struct btf_member *member,
-			       void *kdata, const void *udata)
+			       const struct btf_member *member, void *kdata,
+			       const void *udata)
 {
 	const struct sched_ext_ops *uops = udata;
 	struct sched_ext_ops *ops = kdata;
@@ -4114,7 +4170,7 @@ static int bpf_scx_init(struct btf *btf)
 	if (type_id < 0)
 		return -EINVAL;
 	task_struct_type = btf_type_by_id(btf, type_id);
-        task_struct_type_id = type_id;
+	task_struct_type_id = type_id;
 
 	return 0;
 }
@@ -4136,37 +4192,108 @@ static int bpf_scx_validate(void *kdata)
 	return 0;
 }
 
-static s32 select_cpu_stub(struct task_struct *p, s32 prev_cpu, u64 wake_flags) { return -EINVAL; }
-static void enqueue_stub(struct task_struct *p, u64 enq_flags) {}
-static void dequeue_stub(struct task_struct *p, u64 enq_flags) {}
-static void dispatch_stub(s32 prev_cpu, struct task_struct *p) {}
-static void runnable_stub(struct task_struct *p, u64 enq_flags) {}
-static void running_stub(struct task_struct *p) {}
-static void stopping_stub(struct task_struct *p, bool runnable) {}
-static void quiescent_stub(struct task_struct *p, u64 deq_flags) {}
-static bool yield_stub(struct task_struct *from, struct task_struct *to) { return false; }
-static bool core_sched_before_stub(struct task_struct *a, struct task_struct *b) { return false; }
-static void set_weight_stub(struct task_struct *p, u32 weight) {}
-static void set_cpumask_stub(struct task_struct *p, const struct cpumask *mask) {}
-static void update_idle_stub(s32 cpu, bool idle) {}
-static void cpu_acquire_stub(s32 cpu, struct scx_cpu_acquire_args *args) {}
-static void cpu_release_stub(s32 cpu, struct scx_cpu_release_args *args) {}
-static s32 init_task_stub(struct task_struct *p, struct scx_init_task_args *args) { return -EINVAL; }
-static void exit_task_stub(struct task_struct *p, struct scx_exit_task_args *args) {}
-static void enable_stub(struct task_struct *p) {}
-static void disable_stub(struct task_struct *p) {}
+static s32 select_cpu_stub(struct task_struct *p, s32 prev_cpu, u64 wake_flags)
+{
+	return -EINVAL;
+}
+static void enqueue_stub(struct task_struct *p, u64 enq_flags)
+{
+}
+static void dequeue_stub(struct task_struct *p, u64 enq_flags)
+{
+}
+static void dispatch_stub(s32 prev_cpu, struct task_struct *p)
+{
+}
+static void runnable_stub(struct task_struct *p, u64 enq_flags)
+{
+}
+static void running_stub(struct task_struct *p)
+{
+}
+static void stopping_stub(struct task_struct *p, bool runnable)
+{
+}
+static void quiescent_stub(struct task_struct *p, u64 deq_flags)
+{
+}
+static bool yield_stub(struct task_struct *from, struct task_struct *to)
+{
+	return false;
+}
+static bool core_sched_before_stub(struct task_struct *a, struct task_struct *b)
+{
+	return false;
+}
+static void set_weight_stub(struct task_struct *p, u32 weight)
+{
+}
+static void set_cpumask_stub(struct task_struct *p, const struct cpumask *mask)
+{
+}
+static void update_idle_stub(s32 cpu, bool idle)
+{
+}
+static void cpu_acquire_stub(s32 cpu, struct scx_cpu_acquire_args *args)
+{
+}
+static void cpu_release_stub(s32 cpu, struct scx_cpu_release_args *args)
+{
+}
+static s32 init_task_stub(struct task_struct *p,
+			  struct scx_init_task_args *args)
+{
+	return -EINVAL;
+}
+static void exit_task_stub(struct task_struct *p,
+			   struct scx_exit_task_args *args)
+{
+}
+static void enable_stub(struct task_struct *p)
+{
+}
+static void disable_stub(struct task_struct *p)
+{
+}
 #ifdef CONFIG_EXT_GROUP_SCHED
-static s32 cgroup_init_stub(struct cgroup *cgrp, struct scx_cgroup_init_args *args) { return -EINVAL; }
-static void cgroup_exit_stub(struct cgroup *cgrp) {}
-static s32 cgroup_prep_move_stub(struct task_struct *p, struct cgroup *from, struct cgroup *to) { return -EINVAL; }
-static void cgroup_move_stub(struct task_struct *p, struct cgroup *from, struct cgroup *to) {}
-static void cgroup_cancel_move_stub(struct task_struct *p, struct cgroup *from, struct cgroup *to) {}
-static void cgroup_set_weight_stub(struct cgroup *cgrp, u32 weight) {}
+static s32 cgroup_init_stub(struct cgroup *cgrp,
+			    struct scx_cgroup_init_args *args)
+{
+	return -EINVAL;
+}
+static void cgroup_exit_stub(struct cgroup *cgrp)
+{
+}
+static s32 cgroup_prep_move_stub(struct task_struct *p, struct cgroup *from,
+				 struct cgroup *to)
+{
+	return -EINVAL;
+}
+static void cgroup_move_stub(struct task_struct *p, struct cgroup *from,
+			     struct cgroup *to)
+{
+}
+static void cgroup_cancel_move_stub(struct task_struct *p, struct cgroup *from,
+				    struct cgroup *to)
+{
+}
+static void cgroup_set_weight_stub(struct cgroup *cgrp, u32 weight)
+{
+}
 #endif
-static void cpu_online_stub(s32 cpu) {}
-static void cpu_offline_stub(s32 cpu) {}
-static s32 init_stub(void) { return -EINVAL; }
-static void exit_stub(struct scx_exit_info *info) {}
+static void cpu_online_stub(s32 cpu)
+{
+}
+static void cpu_offline_stub(s32 cpu)
+{
+}
+static s32 init_stub(void)
+{
+	return -EINVAL;
+}
+static void exit_stub(struct scx_exit_info *info)
+{
+}
 
 static struct sched_ext_ops __bpf_ops_sched_ext_ops = {
 	.select_cpu = select_cpu_stub,
@@ -4216,7 +4343,6 @@ static struct bpf_struct_ops bpf_sched_ext_ops = {
 	.cfi_stubs = &__bpf_ops_sched_ext_ops
 };
 
-
 /********************************************************************************
  * System integration and init.
  */
@@ -4230,10 +4356,10 @@ static void sysrq_handle_sched_ext_reset(u8 key)
 }
 
 static const struct sysrq_key_op sysrq_sched_ext_reset_op = {
-	.handler	= sysrq_handle_sched_ext_reset,
-	.help_msg	= "reset-sched-ext(S)",
-	.action_msg	= "Disable sched_ext and revert all tasks to CFS",
-	.enable_mask	= SYSRQ_ENABLE_RTNICE,
+	.handler = sysrq_handle_sched_ext_reset,
+	.help_msg = "reset-sched-ext(S)",
+	.action_msg = "Disable sched_ext and revert all tasks to CFS",
+	.enable_mask = SYSRQ_ENABLE_RTNICE,
 };
 
 static bool can_skip_idle_kick(struct rq *rq)
@@ -4385,12 +4511,13 @@ void print_scx_info(const char *log_lvl, struct task_struct *p)
 			  jiffies_delta_msecs(runnable_at, jiffies));
 
 	/* print everything onto one line to conserve console space */
-	printk("%sSched_ext: %s (%s%s), task: runnable_at=%s",
-	       log_lvl, scx_ops.name, scx_ops_enable_state_str[state], all,
+	printk("%sSched_ext: %s (%s%s), task: runnable_at=%s", log_lvl,
+	       scx_ops.name, scx_ops_enable_state_str[state], all,
 	       runnable_at_buf);
 }
 
-static int scx_pm_handler(struct notifier_block *nb, unsigned long event, void *ptr)
+static int scx_pm_handler(struct notifier_block *nb, unsigned long event,
+			  void *ptr)
 {
 	if (!scx_enabled())
 		return NOTIFY_OK;
@@ -4431,7 +4558,7 @@ void __init init_sched_ext_class(void)
 	 * through the generated vmlinux.h.
 	 */
 	WRITE_ONCE(v, SCX_WAKE_EXEC | SCX_ENQ_WAKEUP | SCX_DEQ_SLEEP |
-		   SCX_TG_ONLINE | SCX_KICK_PREEMPT);
+			      SCX_TG_ONLINE | SCX_KICK_PREEMPT);
 
 	BUG_ON(rhashtable_init(&dsq_hash, &dsq_hash_params));
 	init_dsq(&scx_dsq_global, SCX_DSQ_GLOBAL);
@@ -4439,10 +4566,9 @@ void __init init_sched_ext_class(void)
 	BUG_ON(!alloc_cpumask_var(&idle_masks.cpu, GFP_KERNEL));
 	BUG_ON(!alloc_cpumask_var(&idle_masks.smt, GFP_KERNEL));
 #endif
-	scx_kick_cpus_pnt_seqs =
-		__alloc_percpu(sizeof(scx_kick_cpus_pnt_seqs[0]) *
-			       num_possible_cpus(),
-			       __alignof__(scx_kick_cpus_pnt_seqs[0]));
+	scx_kick_cpus_pnt_seqs = __alloc_percpu(
+		sizeof(scx_kick_cpus_pnt_seqs[0]) * num_possible_cpus(),
+		__alignof__(scx_kick_cpus_pnt_seqs[0]));
 	BUG_ON(!scx_kick_cpus_pnt_seqs);
 
 	for_each_possible_cpu(cpu) {
@@ -4452,17 +4578,19 @@ void __init init_sched_ext_class(void)
 		INIT_LIST_HEAD(&rq->scx.runnable_list);
 
 		BUG_ON(!zalloc_cpumask_var(&rq->scx.cpus_to_kick, GFP_KERNEL));
-		BUG_ON(!zalloc_cpumask_var(&rq->scx.cpus_to_kick_if_idle, GFP_KERNEL));
-		BUG_ON(!zalloc_cpumask_var(&rq->scx.cpus_to_preempt, GFP_KERNEL));
+		BUG_ON(!zalloc_cpumask_var(&rq->scx.cpus_to_kick_if_idle,
+					   GFP_KERNEL));
+		BUG_ON(!zalloc_cpumask_var(&rq->scx.cpus_to_preempt,
+					   GFP_KERNEL));
 		BUG_ON(!zalloc_cpumask_var(&rq->scx.cpus_to_wait, GFP_KERNEL));
-		init_irq_work(&rq->scx.kick_cpus_irq_work, kick_cpus_irq_workfn);
+		init_irq_work(&rq->scx.kick_cpus_irq_work,
+			      kick_cpus_irq_workfn);
 	}
 
 	register_sysrq_key('S', &sysrq_sched_ext_reset_op);
 	INIT_DELAYED_WORK(&scx_watchdog_work, scx_watchdog_workfn);
 	scx_cgroup_config_knobs();
 }
-
 
 /********************************************************************************
  * Helpers that can be called from the BPF scheduler.
@@ -4490,8 +4618,8 @@ BTF_ID_FLAGS(func, scx_bpf_switch_all)
 BTF_KFUNCS_END(scx_kfunc_ids_init)
 
 static const struct btf_kfunc_id_set scx_kfunc_set_init = {
-	.owner			= THIS_MODULE,
-	.set			= &scx_kfunc_ids_init,
+	.owner = THIS_MODULE,
+	.set = &scx_kfunc_ids_init,
 };
 
 /**
@@ -4518,8 +4646,8 @@ BTF_ID_FLAGS(func, scx_bpf_create_dsq, KF_SLEEPABLE)
 BTF_KFUNCS_END(scx_kfunc_ids_sleepable)
 
 static const struct btf_kfunc_id_set scx_kfunc_set_sleepable = {
-	.owner			= THIS_MODULE,
-	.set			= &scx_kfunc_ids_sleepable,
+	.owner = THIS_MODULE,
+	.set = &scx_kfunc_ids_sleepable,
 };
 
 __bpf_kfunc_end_defs();
@@ -4544,7 +4672,8 @@ static bool scx_dispatch_preamble(struct task_struct *p, u64 enq_flags)
 	return true;
 }
 
-static void scx_dispatch_commit(struct task_struct *p, u64 dsq_id, u64 enq_flags)
+static void scx_dispatch_commit(struct task_struct *p, u64 dsq_id,
+				u64 enq_flags)
 {
 	struct task_struct *ddsp_task;
 	int idx;
@@ -4563,7 +4692,8 @@ static void scx_dispatch_commit(struct task_struct *p, u64 dsq_id, u64 enq_flags
 
 	this_cpu_ptr(scx_dsp_buf)[idx] = (struct scx_dsp_buf_ent){
 		.task = p,
-		.qseq = atomic_long_read(&p->scx.ops_state) & SCX_OPSS_QSEQ_MASK,
+		.qseq = atomic_long_read(&p->scx.ops_state) &
+			SCX_OPSS_QSEQ_MASK,
 		.dsq_id = dsq_id,
 		.enq_flags = enq_flags,
 	};
@@ -4609,7 +4739,7 @@ __bpf_kfunc_start_defs();
  * scx_bpf_kick_cpu() to trigger scheduling.
  */
 __bpf_kfunc void scx_bpf_dispatch(struct task_struct *p, u64 dsq_id, u64 slice,
-		      u64 enq_flags)
+				  u64 enq_flags)
 {
 	if (!scx_dispatch_preamble(p, enq_flags))
 		return;
@@ -4639,8 +4769,8 @@ __bpf_kfunc void scx_bpf_dispatch(struct task_struct *p, u64 dsq_id, u64 slice,
  * numerically larger vtime may indicate an earlier position in the ordering and
  * vice-versa.
  */
-__bpf_kfunc void scx_bpf_dispatch_vtime(struct task_struct *p, u64 dsq_id, u64 slice,
-			    u64 vtime, u64 enq_flags)
+__bpf_kfunc void scx_bpf_dispatch_vtime(struct task_struct *p, u64 dsq_id,
+					u64 slice, u64 vtime, u64 enq_flags)
 {
 	if (!scx_dispatch_preamble(p, enq_flags))
 		return;
@@ -4661,8 +4791,8 @@ BTF_ID_FLAGS(func, scx_bpf_dispatch_vtime, KF_RCU)
 BTF_KFUNCS_END(scx_kfunc_ids_enqueue_dispatch)
 
 static const struct btf_kfunc_id_set scx_kfunc_set_enqueue_dispatch = {
-	.owner			= THIS_MODULE,
-	.set			= &scx_kfunc_ids_enqueue_dispatch,
+	.owner = THIS_MODULE,
+	.set = &scx_kfunc_ids_enqueue_dispatch,
 };
 
 /**
@@ -4749,8 +4879,8 @@ BTF_ID_FLAGS(func, scx_bpf_consume)
 BTF_KFUNCS_END(scx_kfunc_ids_dispatch)
 
 static const struct btf_kfunc_id_set scx_kfunc_set_dispatch = {
-	.owner			= THIS_MODULE,
-	.set			= &scx_kfunc_ids_dispatch,
+	.owner = THIS_MODULE,
+	.set = &scx_kfunc_ids_dispatch,
 };
 
 /**
@@ -4800,8 +4930,8 @@ BTF_ID_FLAGS(func, scx_bpf_reenqueue_local)
 BTF_KFUNCS_END(scx_kfunc_ids_cpu_release)
 
 static const struct btf_kfunc_id_set scx_kfunc_set_cpu_release = {
-	.owner			= THIS_MODULE,
-	.set			= &scx_kfunc_ids_cpu_release,
+	.owner = THIS_MODULE,
+	.set = &scx_kfunc_ids_cpu_release,
 };
 
 /**
@@ -4845,7 +4975,8 @@ __bpf_kfunc void scx_bpf_kick_cpu(s32 cpu, u64 flags)
 		struct rq *target_rq = cpu_rq(cpu);
 
 		if (unlikely(flags & (SCX_KICK_PREEMPT | SCX_KICK_WAIT)))
-			scx_ops_error("PREEMPT/WAIT cannot be used with SCX_KICK_IDLE");
+			scx_ops_error(
+				"PREEMPT/WAIT cannot be used with SCX_KICK_IDLE");
 
 		if (raw_spin_rq_trylock(target_rq)) {
 			if (can_skip_idle_kick(target_rq)) {
@@ -4868,6 +4999,19 @@ __bpf_kfunc void scx_bpf_kick_cpu(s32 cpu, u64 flags)
 out:
 	local_irq_restore(irq_flags);
 }
+NOKPROBE_SYMBOL(scx_bpf_kick_cpu);
+
+BPF_CALL_0(bpf_schedule)
+{
+	scx_bpf_kick_cpu(smp_processor_id(), SCX_KICK_PREEMPT);
+	return 0;
+}
+
+const struct bpf_func_proto bpf_schedule_proto = {
+	.func = bpf_schedule,
+	.gpl_only = false,
+	.ret_type = RET_VOID,
+};
 
 /**
  * scx_bpf_dsq_nr_queued - Return the number of queued tasks
@@ -4940,7 +5084,8 @@ __bpf_kfunc bool scx_bpf_test_and_clear_cpu_idle(s32 cpu)
  * Unavailable if ops.update_idle() is implemented and
  * %SCX_OPS_KEEP_BUILTIN_IDLE is not set.
  */
-__bpf_kfunc s32 scx_bpf_pick_idle_cpu(const struct cpumask *cpus_allowed, u64 flags)
+__bpf_kfunc s32 scx_bpf_pick_idle_cpu(const struct cpumask *cpus_allowed,
+				      u64 flags)
 {
 	if (!static_branch_likely(&scx_builtin_idle_enabled)) {
 		scx_ops_error("built-in idle tracking is disabled");
@@ -4964,7 +5109,8 @@ __bpf_kfunc s32 scx_bpf_pick_idle_cpu(const struct cpumask *cpus_allowed, u64 fl
  * set, this function can't tell which CPUs are idle and will always pick any
  * CPU.
  */
-__bpf_kfunc s32 scx_bpf_pick_any_cpu(const struct cpumask *cpus_allowed, u64 flags)
+__bpf_kfunc s32 scx_bpf_pick_any_cpu(const struct cpumask *cpus_allowed,
+				     u64 flags)
 {
 	s32 cpu;
 
@@ -5041,8 +5187,8 @@ __bpf_kfunc void scx_bpf_put_idle_cpumask(const struct cpumask *idle_mask)
 }
 
 struct scx_bpf_error_bstr_bufs {
-	u64			data[MAX_BPRINTF_VARARGS];
-	char			msg[SCX_EXIT_MSG_LEN];
+	u64 data[MAX_BPRINTF_VARARGS];
+	char msg[SCX_EXIT_MSG_LEN];
 };
 
 static DEFINE_PER_CPU(struct scx_bpf_error_bstr_bufs, scx_bpf_error_bstr_bufs);
@@ -5069,8 +5215,8 @@ __bpf_kfunc void scx_bpf_error_bstr(char *fmt, unsigned long long *data,
 
 	if (data__sz % 8 || data__sz > MAX_BPRINTF_VARARGS * 8 ||
 	    (data__sz && !data)) {
-		scx_ops_error("invalid data=%p and data__sz=%u",
-			      (void *)data, data__sz);
+		scx_ops_error("invalid data=%p and data__sz=%u", (void *)data,
+			      data__sz);
 		goto out_restore;
 	}
 
@@ -5169,7 +5315,6 @@ out:
 #endif
 
 BTF_KFUNCS_START(scx_kfunc_ids_ops_only)
-BTF_ID_FLAGS(func, scx_bpf_kick_cpu)
 BTF_ID_FLAGS(func, scx_bpf_dsq_nr_queued)
 BTF_ID_FLAGS(func, scx_bpf_test_and_clear_cpu_idle)
 BTF_ID_FLAGS(func, scx_bpf_pick_idle_cpu, KF_RCU)
@@ -5179,11 +5324,12 @@ BTF_ID_FLAGS(func, scx_bpf_select_cpu_dfl, KF_RCU)
 BTF_KFUNCS_END(scx_kfunc_ids_ops_only)
 
 static const struct btf_kfunc_id_set scx_kfunc_set_ops_only = {
-	.owner			= THIS_MODULE,
-	.set			= &scx_kfunc_ids_ops_only,
+	.owner = THIS_MODULE,
+	.set = &scx_kfunc_ids_ops_only,
 };
 
 BTF_KFUNCS_START(scx_kfunc_ids_any)
+BTF_ID_FLAGS(func, scx_bpf_kick_cpu)
 BTF_ID_FLAGS(func, scx_bpf_get_idle_cpumask, KF_ACQUIRE)
 BTF_ID_FLAGS(func, scx_bpf_get_idle_smtmask, KF_ACQUIRE)
 BTF_ID_FLAGS(func, scx_bpf_put_idle_cpumask, KF_RELEASE)
@@ -5196,8 +5342,8 @@ BTF_ID_FLAGS(func, scx_bpf_task_cgroup, KF_RCU | KF_ACQUIRE)
 BTF_KFUNCS_END(scx_kfunc_ids_any)
 
 static const struct btf_kfunc_id_set scx_kfunc_set_any = {
-	.owner			= THIS_MODULE,
-	.set			= &scx_kfunc_ids_any,
+	.owner = THIS_MODULE,
+	.set = &scx_kfunc_ids_any,
 };
 
 __bpf_kfunc_end_defs();
@@ -5249,7 +5395,8 @@ static int __init scx_init(void)
 		return ret;
 	}
 
-	scx_kset = kset_create_and_add("sched_ext", &scx_uevent_ops, kernel_kobj);
+	scx_kset =
+		kset_create_and_add("sched_ext", &scx_uevent_ops, kernel_kobj);
 	if (!scx_kset) {
 		pr_err("sched_ext: Failed to create /sys/sched_ext\n");
 		return -ENOMEM;

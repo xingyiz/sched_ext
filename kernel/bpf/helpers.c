@@ -39,20 +39,20 @@ BPF_CALL_2(bpf_map_lookup_elem, struct bpf_map *, map, void *, key)
 {
 	WARN_ON_ONCE(!rcu_read_lock_held() && !rcu_read_lock_trace_held() &&
 		     !rcu_read_lock_bh_held());
-	return (unsigned long) map->ops->map_lookup_elem(map, key);
+	return (unsigned long)map->ops->map_lookup_elem(map, key);
 }
 
 const struct bpf_func_proto bpf_map_lookup_elem_proto = {
-	.func		= bpf_map_lookup_elem,
-	.gpl_only	= false,
-	.pkt_access	= true,
-	.ret_type	= RET_PTR_TO_MAP_VALUE_OR_NULL,
-	.arg1_type	= ARG_CONST_MAP_PTR,
-	.arg2_type	= ARG_PTR_TO_MAP_KEY,
+	.func = bpf_map_lookup_elem,
+	.gpl_only = false,
+	.pkt_access = true,
+	.ret_type = RET_PTR_TO_MAP_VALUE_OR_NULL,
+	.arg1_type = ARG_CONST_MAP_PTR,
+	.arg2_type = ARG_PTR_TO_MAP_KEY,
 };
 
-BPF_CALL_4(bpf_map_update_elem, struct bpf_map *, map, void *, key,
-	   void *, value, u64, flags)
+BPF_CALL_4(bpf_map_update_elem, struct bpf_map *, map, void *, key, void *,
+	   value, u64, flags)
 {
 	WARN_ON_ONCE(!rcu_read_lock_held() && !rcu_read_lock_trace_held() &&
 		     !rcu_read_lock_bh_held());
@@ -60,14 +60,14 @@ BPF_CALL_4(bpf_map_update_elem, struct bpf_map *, map, void *, key,
 }
 
 const struct bpf_func_proto bpf_map_update_elem_proto = {
-	.func		= bpf_map_update_elem,
-	.gpl_only	= false,
-	.pkt_access	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_CONST_MAP_PTR,
-	.arg2_type	= ARG_PTR_TO_MAP_KEY,
-	.arg3_type	= ARG_PTR_TO_MAP_VALUE,
-	.arg4_type	= ARG_ANYTHING,
+	.func = bpf_map_update_elem,
+	.gpl_only = false,
+	.pkt_access = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_CONST_MAP_PTR,
+	.arg2_type = ARG_PTR_TO_MAP_KEY,
+	.arg3_type = ARG_PTR_TO_MAP_VALUE,
+	.arg4_type = ARG_ANYTHING,
 };
 
 BPF_CALL_2(bpf_map_delete_elem, struct bpf_map *, map, void *, key)
@@ -78,12 +78,12 @@ BPF_CALL_2(bpf_map_delete_elem, struct bpf_map *, map, void *, key)
 }
 
 const struct bpf_func_proto bpf_map_delete_elem_proto = {
-	.func		= bpf_map_delete_elem,
-	.gpl_only	= false,
-	.pkt_access	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_CONST_MAP_PTR,
-	.arg2_type	= ARG_PTR_TO_MAP_KEY,
+	.func = bpf_map_delete_elem,
+	.gpl_only = false,
+	.pkt_access = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_CONST_MAP_PTR,
+	.arg2_type = ARG_PTR_TO_MAP_KEY,
 };
 
 BPF_CALL_3(bpf_map_push_elem, struct bpf_map *, map, void *, value, u64, flags)
@@ -92,13 +92,13 @@ BPF_CALL_3(bpf_map_push_elem, struct bpf_map *, map, void *, value, u64, flags)
 }
 
 const struct bpf_func_proto bpf_map_push_elem_proto = {
-	.func		= bpf_map_push_elem,
-	.gpl_only	= false,
-	.pkt_access	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_CONST_MAP_PTR,
-	.arg2_type	= ARG_PTR_TO_MAP_VALUE,
-	.arg3_type	= ARG_ANYTHING,
+	.func = bpf_map_push_elem,
+	.gpl_only = false,
+	.pkt_access = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_CONST_MAP_PTR,
+	.arg2_type = ARG_PTR_TO_MAP_VALUE,
+	.arg3_type = ARG_ANYTHING,
 };
 
 BPF_CALL_2(bpf_map_pop_elem, struct bpf_map *, map, void *, value)
@@ -107,11 +107,11 @@ BPF_CALL_2(bpf_map_pop_elem, struct bpf_map *, map, void *, value)
 }
 
 const struct bpf_func_proto bpf_map_pop_elem_proto = {
-	.func		= bpf_map_pop_elem,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_CONST_MAP_PTR,
-	.arg2_type	= ARG_PTR_TO_MAP_VALUE | MEM_UNINIT,
+	.func = bpf_map_pop_elem,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_CONST_MAP_PTR,
+	.arg2_type = ARG_PTR_TO_MAP_VALUE | MEM_UNINIT,
 };
 
 BPF_CALL_2(bpf_map_peek_elem, struct bpf_map *, map, void *, value)
@@ -120,33 +120,34 @@ BPF_CALL_2(bpf_map_peek_elem, struct bpf_map *, map, void *, value)
 }
 
 const struct bpf_func_proto bpf_map_peek_elem_proto = {
-	.func		= bpf_map_peek_elem,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_CONST_MAP_PTR,
-	.arg2_type	= ARG_PTR_TO_MAP_VALUE | MEM_UNINIT,
+	.func = bpf_map_peek_elem,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_CONST_MAP_PTR,
+	.arg2_type = ARG_PTR_TO_MAP_VALUE | MEM_UNINIT,
 };
 
-BPF_CALL_3(bpf_map_lookup_percpu_elem, struct bpf_map *, map, void *, key, u32, cpu)
+BPF_CALL_3(bpf_map_lookup_percpu_elem, struct bpf_map *, map, void *, key, u32,
+	   cpu)
 {
 	WARN_ON_ONCE(!rcu_read_lock_held() && !rcu_read_lock_bh_held());
-	return (unsigned long) map->ops->map_lookup_percpu_elem(map, key, cpu);
+	return (unsigned long)map->ops->map_lookup_percpu_elem(map, key, cpu);
 }
 
 const struct bpf_func_proto bpf_map_lookup_percpu_elem_proto = {
-	.func		= bpf_map_lookup_percpu_elem,
-	.gpl_only	= false,
-	.pkt_access	= true,
-	.ret_type	= RET_PTR_TO_MAP_VALUE_OR_NULL,
-	.arg1_type	= ARG_CONST_MAP_PTR,
-	.arg2_type	= ARG_PTR_TO_MAP_KEY,
-	.arg3_type	= ARG_ANYTHING,
+	.func = bpf_map_lookup_percpu_elem,
+	.gpl_only = false,
+	.pkt_access = true,
+	.ret_type = RET_PTR_TO_MAP_VALUE_OR_NULL,
+	.arg1_type = ARG_CONST_MAP_PTR,
+	.arg2_type = ARG_PTR_TO_MAP_KEY,
+	.arg3_type = ARG_ANYTHING,
 };
 
 const struct bpf_func_proto bpf_get_prandom_u32_proto = {
-	.func		= bpf_user_rnd_u32,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
+	.func = bpf_user_rnd_u32,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
 };
 
 BPF_CALL_0(bpf_get_smp_processor_id)
@@ -155,9 +156,9 @@ BPF_CALL_0(bpf_get_smp_processor_id)
 }
 
 const struct bpf_func_proto bpf_get_smp_processor_id_proto = {
-	.func		= bpf_get_smp_processor_id,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
+	.func = bpf_get_smp_processor_id,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
 };
 
 BPF_CALL_0(bpf_get_numa_node_id)
@@ -166,9 +167,9 @@ BPF_CALL_0(bpf_get_numa_node_id)
 }
 
 const struct bpf_func_proto bpf_get_numa_node_id_proto = {
-	.func		= bpf_get_numa_node_id,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
+	.func = bpf_get_numa_node_id,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
 };
 
 BPF_CALL_0(bpf_ktime_get_ns)
@@ -178,9 +179,9 @@ BPF_CALL_0(bpf_ktime_get_ns)
 }
 
 const struct bpf_func_proto bpf_ktime_get_ns_proto = {
-	.func		= bpf_ktime_get_ns,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
+	.func = bpf_ktime_get_ns,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
 };
 
 BPF_CALL_0(bpf_ktime_get_boot_ns)
@@ -190,9 +191,9 @@ BPF_CALL_0(bpf_ktime_get_boot_ns)
 }
 
 const struct bpf_func_proto bpf_ktime_get_boot_ns_proto = {
-	.func		= bpf_ktime_get_boot_ns,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
+	.func = bpf_ktime_get_boot_ns,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
 };
 
 BPF_CALL_0(bpf_ktime_get_coarse_ns)
@@ -201,9 +202,9 @@ BPF_CALL_0(bpf_ktime_get_coarse_ns)
 }
 
 const struct bpf_func_proto bpf_ktime_get_coarse_ns_proto = {
-	.func		= bpf_ktime_get_coarse_ns,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
+	.func = bpf_ktime_get_coarse_ns,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
 };
 
 BPF_CALL_0(bpf_ktime_get_tai_ns)
@@ -213,9 +214,9 @@ BPF_CALL_0(bpf_ktime_get_tai_ns)
 }
 
 const struct bpf_func_proto bpf_ktime_get_tai_ns_proto = {
-	.func		= bpf_ktime_get_tai_ns,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
+	.func = bpf_ktime_get_tai_ns,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
 };
 
 BPF_CALL_0(bpf_get_current_pid_tgid)
@@ -225,13 +226,13 @@ BPF_CALL_0(bpf_get_current_pid_tgid)
 	if (unlikely(!task))
 		return -EINVAL;
 
-	return (u64) task->tgid << 32 | task->pid;
+	return (u64)task->tgid << 32 | task->pid;
 }
 
 const struct bpf_func_proto bpf_get_current_pid_tgid_proto = {
-	.func		= bpf_get_current_pid_tgid,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
+	.func = bpf_get_current_pid_tgid,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
 };
 
 BPF_CALL_0(bpf_get_current_uid_gid)
@@ -244,14 +245,14 @@ BPF_CALL_0(bpf_get_current_uid_gid)
 		return -EINVAL;
 
 	current_uid_gid(&uid, &gid);
-	return (u64) from_kgid(&init_user_ns, gid) << 32 |
-		     from_kuid(&init_user_ns, uid);
+	return (u64)from_kgid(&init_user_ns, gid) << 32 |
+	       from_kuid(&init_user_ns, uid);
 }
 
 const struct bpf_func_proto bpf_get_current_uid_gid_proto = {
-	.func		= bpf_get_current_uid_gid,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
+	.func = bpf_get_current_uid_gid,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
 };
 
 BPF_CALL_2(bpf_get_current_comm, char *, buf, u32, size)
@@ -270,11 +271,11 @@ err_clear:
 }
 
 const struct bpf_func_proto bpf_get_current_comm_proto = {
-	.func		= bpf_get_current_comm,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
-	.arg2_type	= ARG_CONST_SIZE,
+	.func = bpf_get_current_comm,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg2_type = ARG_CONST_SIZE,
 };
 
 #if defined(CONFIG_QUEUED_SPINLOCKS) || defined(CONFIG_BPF_ARCH_SPINLOCK)
@@ -341,11 +342,11 @@ NOTRACE_BPF_CALL_1(bpf_spin_lock, struct bpf_spin_lock *, lock)
 }
 
 const struct bpf_func_proto bpf_spin_lock_proto = {
-	.func		= bpf_spin_lock,
-	.gpl_only	= false,
-	.ret_type	= RET_VOID,
-	.arg1_type	= ARG_PTR_TO_SPIN_LOCK,
-	.arg1_btf_id    = BPF_PTR_POISON,
+	.func = bpf_spin_lock,
+	.gpl_only = false,
+	.ret_type = RET_VOID,
+	.arg1_type = ARG_PTR_TO_SPIN_LOCK,
+	.arg1_btf_id = BPF_PTR_POISON,
 };
 
 static inline void __bpf_spin_unlock_irqrestore(struct bpf_spin_lock *lock)
@@ -364,11 +365,11 @@ NOTRACE_BPF_CALL_1(bpf_spin_unlock, struct bpf_spin_lock *, lock)
 }
 
 const struct bpf_func_proto bpf_spin_unlock_proto = {
-	.func		= bpf_spin_unlock,
-	.gpl_only	= false,
-	.ret_type	= RET_VOID,
-	.arg1_type	= ARG_PTR_TO_SPIN_LOCK,
-	.arg1_btf_id    = BPF_PTR_POISON,
+	.func = bpf_spin_unlock,
+	.gpl_only = false,
+	.ret_type = RET_VOID,
+	.arg1_type = ARG_PTR_TO_SPIN_LOCK,
+	.arg1_btf_id = BPF_PTR_POISON,
 };
 
 void copy_map_value_locked(struct bpf_map *map, void *dst, void *src,
@@ -393,9 +394,9 @@ BPF_CALL_0(bpf_jiffies64)
 }
 
 const struct bpf_func_proto bpf_jiffies64_proto = {
-	.func		= bpf_jiffies64,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
+	.func = bpf_jiffies64,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
 };
 
 #ifdef CONFIG_CGROUPS
@@ -413,9 +414,9 @@ BPF_CALL_0(bpf_get_current_cgroup_id)
 }
 
 const struct bpf_func_proto bpf_get_current_cgroup_id_proto = {
-	.func		= bpf_get_current_cgroup_id,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
+	.func = bpf_get_current_cgroup_id,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
 };
 
 BPF_CALL_1(bpf_get_current_ancestor_cgroup_id, int, ancestor_level)
@@ -434,10 +435,10 @@ BPF_CALL_1(bpf_get_current_ancestor_cgroup_id, int, ancestor_level)
 }
 
 const struct bpf_func_proto bpf_get_current_ancestor_cgroup_id_proto = {
-	.func		= bpf_get_current_ancestor_cgroup_id,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_ANYTHING,
+	.func = bpf_get_current_ancestor_cgroup_id,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_ANYTHING,
 };
 #endif /* CONFIG_CGROUPS */
 
@@ -516,8 +517,8 @@ static int __bpf_strtoll(const char *buf, size_t buf_len, u64 flags,
 	return err;
 }
 
-BPF_CALL_4(bpf_strtol, const char *, buf, size_t, buf_len, u64, flags,
-	   long *, res)
+BPF_CALL_4(bpf_strtol, const char *, buf, size_t, buf_len, u64, flags, long *,
+	   res)
 {
 	long long _res;
 	int err;
@@ -532,13 +533,13 @@ BPF_CALL_4(bpf_strtol, const char *, buf, size_t, buf_len, u64, flags,
 }
 
 const struct bpf_func_proto bpf_strtol_proto = {
-	.func		= bpf_strtol,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg2_type	= ARG_CONST_SIZE,
-	.arg3_type	= ARG_ANYTHING,
-	.arg4_type	= ARG_PTR_TO_LONG,
+	.func = bpf_strtol,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg2_type = ARG_CONST_SIZE,
+	.arg3_type = ARG_ANYTHING,
+	.arg4_type = ARG_PTR_TO_LONG,
 };
 
 BPF_CALL_4(bpf_strtoul, const char *, buf, size_t, buf_len, u64, flags,
@@ -560,13 +561,13 @@ BPF_CALL_4(bpf_strtoul, const char *, buf, size_t, buf_len, u64, flags,
 }
 
 const struct bpf_func_proto bpf_strtoul_proto = {
-	.func		= bpf_strtoul,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg2_type	= ARG_CONST_SIZE,
-	.arg3_type	= ARG_ANYTHING,
-	.arg4_type	= ARG_PTR_TO_LONG,
+	.func = bpf_strtoul,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg2_type = ARG_CONST_SIZE,
+	.arg3_type = ARG_ANYTHING,
+	.arg4_type = ARG_PTR_TO_LONG,
 };
 
 BPF_CALL_3(bpf_strncmp, const char *, s1, u32, s1_sz, const char *, s2)
@@ -575,12 +576,12 @@ BPF_CALL_3(bpf_strncmp, const char *, s1, u32, s1_sz, const char *, s2)
 }
 
 static const struct bpf_func_proto bpf_strncmp_proto = {
-	.func		= bpf_strncmp,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg2_type	= ARG_CONST_SIZE,
-	.arg3_type	= ARG_PTR_TO_CONST_STR,
+	.func = bpf_strncmp,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg2_type = ARG_CONST_SIZE,
+	.arg3_type = ARG_PTR_TO_CONST_STR,
 };
 
 BPF_CALL_4(bpf_get_ns_current_pid_tgid, u64, dev, u64, ino,
@@ -612,28 +613,28 @@ BPF_CALL_4(bpf_get_ns_current_pid_tgid, u64, dev, u64, ino,
 	nsdata->tgid = task_tgid_nr_ns(task, pidns);
 	return 0;
 clear:
-	memset((void *)nsdata, 0, (size_t) size);
+	memset((void *)nsdata, 0, (size_t)size);
 	return err;
 }
 
 const struct bpf_func_proto bpf_get_ns_current_pid_tgid_proto = {
-	.func		= bpf_get_ns_current_pid_tgid,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_ANYTHING,
-	.arg2_type	= ARG_ANYTHING,
-	.arg3_type      = ARG_PTR_TO_UNINIT_MEM,
-	.arg4_type      = ARG_CONST_SIZE,
+	.func = bpf_get_ns_current_pid_tgid,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_ANYTHING,
+	.arg2_type = ARG_ANYTHING,
+	.arg3_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg4_type = ARG_CONST_SIZE,
 };
 
 static const struct bpf_func_proto bpf_get_raw_smp_processor_id_proto = {
-	.func		= bpf_get_raw_cpu_id,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
+	.func = bpf_get_raw_cpu_id,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
 };
 
-BPF_CALL_5(bpf_event_output_data, void *, ctx, struct bpf_map *, map,
-	   u64, flags, void *, data, u64, size)
+BPF_CALL_5(bpf_event_output_data, void *, ctx, struct bpf_map *, map, u64,
+	   flags, void *, data, u64, size)
 {
 	if (unlikely(flags & ~(BPF_F_INDEX_MASK)))
 		return -EINVAL;
@@ -641,19 +642,19 @@ BPF_CALL_5(bpf_event_output_data, void *, ctx, struct bpf_map *, map,
 	return bpf_event_output(map, flags, data, size, NULL, 0, NULL);
 }
 
-const struct bpf_func_proto bpf_event_output_data_proto =  {
-	.func		= bpf_event_output_data,
-	.gpl_only       = true,
-	.ret_type       = RET_INTEGER,
-	.arg1_type      = ARG_PTR_TO_CTX,
-	.arg2_type      = ARG_CONST_MAP_PTR,
-	.arg3_type      = ARG_ANYTHING,
-	.arg4_type      = ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg5_type      = ARG_CONST_SIZE_OR_ZERO,
+const struct bpf_func_proto bpf_event_output_data_proto = {
+	.func = bpf_event_output_data,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
+	.arg2_type = ARG_CONST_MAP_PTR,
+	.arg3_type = ARG_ANYTHING,
+	.arg4_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg5_type = ARG_CONST_SIZE_OR_ZERO,
 };
 
-BPF_CALL_3(bpf_copy_from_user, void *, dst, u32, size,
-	   const void __user *, user_ptr)
+BPF_CALL_3(bpf_copy_from_user, void *, dst, u32, size, const void __user *,
+	   user_ptr)
 {
 	int ret = copy_from_user(dst, user_ptr, size);
 
@@ -666,17 +667,17 @@ BPF_CALL_3(bpf_copy_from_user, void *, dst, u32, size,
 }
 
 const struct bpf_func_proto bpf_copy_from_user_proto = {
-	.func		= bpf_copy_from_user,
-	.gpl_only	= false,
-	.might_sleep	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
-	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
-	.arg3_type	= ARG_ANYTHING,
+	.func = bpf_copy_from_user,
+	.gpl_only = false,
+	.might_sleep = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg2_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg3_type = ARG_ANYTHING,
 };
 
-BPF_CALL_5(bpf_copy_from_user_task, void *, dst, u32, size,
-	   const void __user *, user_ptr, struct task_struct *, tsk, u64, flags)
+BPF_CALL_5(bpf_copy_from_user_task, void *, dst, u32, size, const void __user *,
+	   user_ptr, struct task_struct *, tsk, u64, flags)
 {
 	int ret;
 
@@ -697,16 +698,16 @@ BPF_CALL_5(bpf_copy_from_user_task, void *, dst, u32, size,
 }
 
 const struct bpf_func_proto bpf_copy_from_user_task_proto = {
-	.func		= bpf_copy_from_user_task,
-	.gpl_only	= true,
-	.might_sleep	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
-	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
-	.arg3_type	= ARG_ANYTHING,
-	.arg4_type	= ARG_PTR_TO_BTF_ID,
-	.arg4_btf_id	= &btf_tracing_ids[BTF_TRACING_TYPE_TASK],
-	.arg5_type	= ARG_ANYTHING
+	.func = bpf_copy_from_user_task,
+	.gpl_only = true,
+	.might_sleep = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg2_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg3_type = ARG_ANYTHING,
+	.arg4_type = ARG_PTR_TO_BTF_ID,
+	.arg4_btf_id = &btf_tracing_ids[BTF_TRACING_TYPE_TASK],
+	.arg5_type = ARG_ANYTHING
 };
 
 BPF_CALL_2(bpf_per_cpu_ptr, const void *, ptr, u32, cpu)
@@ -718,11 +719,11 @@ BPF_CALL_2(bpf_per_cpu_ptr, const void *, ptr, u32, cpu)
 }
 
 const struct bpf_func_proto bpf_per_cpu_ptr_proto = {
-	.func		= bpf_per_cpu_ptr,
-	.gpl_only	= false,
-	.ret_type	= RET_PTR_TO_MEM_OR_BTF_ID | PTR_MAYBE_NULL | MEM_RDONLY,
-	.arg1_type	= ARG_PTR_TO_PERCPU_BTF_ID,
-	.arg2_type	= ARG_ANYTHING,
+	.func = bpf_per_cpu_ptr,
+	.gpl_only = false,
+	.ret_type = RET_PTR_TO_MEM_OR_BTF_ID | PTR_MAYBE_NULL | MEM_RDONLY,
+	.arg1_type = ARG_PTR_TO_PERCPU_BTF_ID,
+	.arg2_type = ARG_ANYTHING,
 };
 
 BPF_CALL_1(bpf_this_cpu_ptr, const void *, percpu_ptr)
@@ -731,14 +732,14 @@ BPF_CALL_1(bpf_this_cpu_ptr, const void *, percpu_ptr)
 }
 
 const struct bpf_func_proto bpf_this_cpu_ptr_proto = {
-	.func		= bpf_this_cpu_ptr,
-	.gpl_only	= false,
-	.ret_type	= RET_PTR_TO_MEM_OR_BTF_ID | MEM_RDONLY,
-	.arg1_type	= ARG_PTR_TO_PERCPU_BTF_ID,
+	.func = bpf_this_cpu_ptr,
+	.gpl_only = false,
+	.ret_type = RET_PTR_TO_MEM_OR_BTF_ID | MEM_RDONLY,
+	.arg1_type = ARG_PTR_TO_PERCPU_BTF_ID,
 };
 
 static int bpf_trace_copy_string(char *buf, void *unsafe_ptr, char fmt_ptype,
-		size_t bufsz)
+				 size_t bufsz)
 {
 	void __user *user_ptr = (__force void __user *)unsafe_ptr;
 
@@ -763,16 +764,17 @@ static int bpf_trace_copy_string(char *buf, void *unsafe_ptr, char fmt_ptype,
 /* Per-cpu temp buffers used by printf-like helpers to store the bprintf binary
  * arguments representation.
  */
-#define MAX_BPRINTF_BIN_ARGS	512
+#define MAX_BPRINTF_BIN_ARGS 512
 
 /* Support executing three nested bprintf helper calls on a given CPU */
-#define MAX_BPRINTF_NEST_LEVEL	3
+#define MAX_BPRINTF_NEST_LEVEL 3
 struct bpf_bprintf_buffers {
 	char bin_args[MAX_BPRINTF_BIN_ARGS];
 	char buf[MAX_BPRINTF_BUF];
 };
 
-static DEFINE_PER_CPU(struct bpf_bprintf_buffers[MAX_BPRINTF_NEST_LEVEL], bpf_bprintf_bufs);
+static DEFINE_PER_CPU(struct bpf_bprintf_buffers[MAX_BPRINTF_NEST_LEVEL],
+		      bpf_bprintf_bufs);
 static DEFINE_PER_CPU(int, bpf_bprintf_nest_level);
 
 static int try_get_buffers(struct bpf_bprintf_buffers **bufs)
@@ -845,7 +847,8 @@ int bpf_bprintf_prepare(char *fmt, u32 fmt_size, const u64 *raw_args,
 		data->buf = buffers->buf;
 
 	for (i = 0; i < fmt_size; i++) {
-		if ((!isprint(fmt[i]) && !isspace(fmt[i])) || !isascii(fmt[i])) {
+		if ((!isprint(fmt[i]) && !isspace(fmt[i])) ||
+		    !isascii(fmt[i])) {
 			err = -EINVAL;
 			goto out;
 		}
@@ -869,7 +872,7 @@ int bpf_bprintf_prepare(char *fmt, u32 fmt_size, const u64 *raw_args,
 		i++;
 
 		/* skip optional "[0 +-][num]" width formatting field */
-		while (fmt[i] == '0' || fmt[i] == '+'  || fmt[i] == '-' ||
+		while (fmt[i] == '0' || fmt[i] == '+' || fmt[i] == '-' ||
 		       fmt[i] == ' ')
 			i++;
 		if (fmt[i] >= '1' && fmt[i] <= '9') {
@@ -900,11 +903,12 @@ int bpf_bprintf_prepare(char *fmt, u32 fmt_size, const u64 *raw_args,
 			}
 
 			if (fmt[i + 1] == 'B') {
-				if (tmp_buf)  {
-					err = snprintf(tmp_buf,
-						       (tmp_buf_end - tmp_buf),
-						       "%pB",
-						       (void *)(long)raw_args[num_spec]);
+				if (tmp_buf) {
+					err = snprintf(
+						tmp_buf,
+						(tmp_buf_end - tmp_buf), "%pB",
+						(void *)(long)
+							raw_args[num_spec]);
 					tmp_buf += (err + 1);
 				}
 
@@ -942,8 +946,8 @@ int bpf_bprintf_prepare(char *fmt, u32 fmt_size, const u64 *raw_args,
 			 */
 			ip_spec[2] = fmt[i - 1];
 			ip_spec[3] = fmt[i];
-			err = snprintf(tmp_buf, tmp_buf_end - tmp_buf,
-				       ip_spec, &cur_ip);
+			err = snprintf(tmp_buf, tmp_buf_end - tmp_buf, ip_spec,
+				       &cur_ip);
 
 			tmp_buf += err + 1;
 			num_spec++;
@@ -952,8 +956,7 @@ int bpf_bprintf_prepare(char *fmt, u32 fmt_size, const u64 *raw_args,
 		} else if (fmt[i] == 's') {
 			fmt_ptype = fmt[i];
 fmt_str:
-			if (fmt[i + 1] != 0 &&
-			    !isspace(fmt[i + 1]) &&
+			if (fmt[i + 1] != 0 && !isspace(fmt[i + 1]) &&
 			    !ispunct(fmt[i + 1])) {
 				err = -EINVAL;
 				goto out;
@@ -1041,11 +1044,11 @@ out:
 	return err;
 }
 
-BPF_CALL_5(bpf_snprintf, char *, str, u32, str_size, char *, fmt,
-	   const void *, args, u32, data_len)
+BPF_CALL_5(bpf_snprintf, char *, str, u32, str_size, char *, fmt, const void *,
+	   args, u32, data_len)
 {
 	struct bpf_bprintf_data data = {
-		.get_bin_args	= true,
+		.get_bin_args = true,
 	};
 	int err, num_args;
 
@@ -1069,14 +1072,14 @@ BPF_CALL_5(bpf_snprintf, char *, str, u32, str_size, char *, fmt,
 }
 
 const struct bpf_func_proto bpf_snprintf_proto = {
-	.func		= bpf_snprintf,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_MEM_OR_NULL,
-	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
-	.arg3_type	= ARG_PTR_TO_CONST_STR,
-	.arg4_type	= ARG_PTR_TO_MEM | PTR_MAYBE_NULL | MEM_RDONLY,
-	.arg5_type	= ARG_CONST_SIZE_OR_ZERO,
+	.func = bpf_snprintf,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_MEM_OR_NULL,
+	.arg2_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg3_type = ARG_PTR_TO_CONST_STR,
+	.arg4_type = ARG_PTR_TO_MEM | PTR_MAYBE_NULL | MEM_RDONLY,
+	.arg5_type = ARG_CONST_SIZE_OR_ZERO,
 };
 
 /* BPF map elements can contain 'struct bpf_timer'.
@@ -1117,7 +1120,8 @@ static DEFINE_PER_CPU(struct bpf_hrtimer *, hrtimer_running);
 
 static enum hrtimer_restart bpf_timer_cb(struct hrtimer *hrtimer)
 {
-	struct bpf_hrtimer *t = container_of(hrtimer, struct bpf_hrtimer, timer);
+	struct bpf_hrtimer *t =
+		container_of(hrtimer, struct bpf_hrtimer, timer);
 	struct bpf_map *map = t->map;
 	void *value = t->value;
 	bpf_callback_t callback_fn;
@@ -1125,7 +1129,8 @@ static enum hrtimer_restart bpf_timer_cb(struct hrtimer *hrtimer)
 	u32 idx;
 
 	BTF_TYPE_EMIT(struct bpf_timer);
-	callback_fn = rcu_dereference_check(t->callback_fn, rcu_read_lock_bh_held());
+	callback_fn =
+		rcu_dereference_check(t->callback_fn, rcu_read_lock_bh_held());
 	if (!callback_fn)
 		goto out;
 
@@ -1137,7 +1142,8 @@ static enum hrtimer_restart bpf_timer_cb(struct hrtimer *hrtimer)
 	 */
 	this_cpu_write(hrtimer_running, t);
 	if (map->map_type == BPF_MAP_TYPE_ARRAY) {
-		struct bpf_array *array = container_of(map, struct bpf_array, map);
+		struct bpf_array *array =
+			container_of(map, struct bpf_array, map);
 
 		/* compute the key */
 		idx = ((char *)value - array->value) / array->elem_size;
@@ -1154,8 +1160,8 @@ out:
 	return HRTIMER_NORESTART;
 }
 
-BPF_CALL_3(bpf_timer_init, struct bpf_timer_kern *, timer, struct bpf_map *, map,
-	   u64, flags)
+BPF_CALL_3(bpf_timer_init, struct bpf_timer_kern *, timer, struct bpf_map *,
+	   map, u64, flags)
 {
 	clockid_t clockid = flags & (MAX_CLOCKS - 1);
 	struct bpf_hrtimer *t;
@@ -1163,15 +1169,15 @@ BPF_CALL_3(bpf_timer_init, struct bpf_timer_kern *, timer, struct bpf_map *, map
 
 	BUILD_BUG_ON(MAX_CLOCKS != 16);
 	BUILD_BUG_ON(sizeof(struct bpf_timer_kern) > sizeof(struct bpf_timer));
-	BUILD_BUG_ON(__alignof__(struct bpf_timer_kern) != __alignof__(struct bpf_timer));
+	BUILD_BUG_ON(__alignof__(struct bpf_timer_kern) !=
+		     __alignof__(struct bpf_timer));
 
 	if (in_nmi())
 		return -EOPNOTSUPP;
 
 	if (flags >= MAX_CLOCKS ||
 	    /* similar to timerfd except _ALARM variants are not supported */
-	    (clockid != CLOCK_MONOTONIC &&
-	     clockid != CLOCK_REALTIME &&
+	    (clockid != CLOCK_MONOTONIC && clockid != CLOCK_REALTIME &&
 	     clockid != CLOCK_BOOTTIME))
 		return -EINVAL;
 	__bpf_spin_lock_irqsave(&timer->lock);
@@ -1213,16 +1219,16 @@ out:
 }
 
 static const struct bpf_func_proto bpf_timer_init_proto = {
-	.func		= bpf_timer_init,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_TIMER,
-	.arg2_type	= ARG_CONST_MAP_PTR,
-	.arg3_type	= ARG_ANYTHING,
+	.func = bpf_timer_init,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_TIMER,
+	.arg2_type = ARG_CONST_MAP_PTR,
+	.arg3_type = ARG_ANYTHING,
 };
 
-BPF_CALL_3(bpf_timer_set_callback, struct bpf_timer_kern *, timer, void *, callback_fn,
-	   struct bpf_prog_aux *, aux)
+BPF_CALL_3(bpf_timer_set_callback, struct bpf_timer_kern *, timer, void *,
+	   callback_fn, struct bpf_prog_aux *, aux)
 {
 	struct bpf_prog *prev, *prog = aux->prog;
 	struct bpf_hrtimer *t;
@@ -1267,14 +1273,15 @@ out:
 }
 
 static const struct bpf_func_proto bpf_timer_set_callback_proto = {
-	.func		= bpf_timer_set_callback,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_TIMER,
-	.arg2_type	= ARG_PTR_TO_FUNC,
+	.func = bpf_timer_set_callback,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_TIMER,
+	.arg2_type = ARG_PTR_TO_FUNC,
 };
 
-BPF_CALL_3(bpf_timer_start, struct bpf_timer_kern *, timer, u64, nsecs, u64, flags)
+BPF_CALL_3(bpf_timer_start, struct bpf_timer_kern *, timer, u64, nsecs, u64,
+	   flags)
 {
 	struct bpf_hrtimer *t;
 	int ret = 0;
@@ -1306,12 +1313,12 @@ out:
 }
 
 static const struct bpf_func_proto bpf_timer_start_proto = {
-	.func		= bpf_timer_start,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_TIMER,
-	.arg2_type	= ARG_ANYTHING,
-	.arg3_type	= ARG_ANYTHING,
+	.func = bpf_timer_start,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_TIMER,
+	.arg2_type = ARG_ANYTHING,
+	.arg3_type = ARG_ANYTHING,
 };
 
 static void drop_prog_refcnt(struct bpf_hrtimer *t)
@@ -1357,10 +1364,10 @@ out:
 }
 
 static const struct bpf_func_proto bpf_timer_cancel_proto = {
-	.func		= bpf_timer_cancel,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_TIMER,
+	.func = bpf_timer_cancel,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_TIMER,
 };
 
 /* This function is called by map_delete/update_elem for individual element and
@@ -1423,22 +1430,22 @@ BPF_CALL_2(bpf_kptr_xchg, void *, map_value, void *, ptr)
  * denote type that verifier will determine.
  */
 static const struct bpf_func_proto bpf_kptr_xchg_proto = {
-	.func         = bpf_kptr_xchg,
-	.gpl_only     = false,
-	.ret_type     = RET_PTR_TO_BTF_ID_OR_NULL,
-	.ret_btf_id   = BPF_PTR_POISON,
-	.arg1_type    = ARG_PTR_TO_KPTR,
-	.arg2_type    = ARG_PTR_TO_BTF_ID_OR_NULL | OBJ_RELEASE,
-	.arg2_btf_id  = BPF_PTR_POISON,
+	.func = bpf_kptr_xchg,
+	.gpl_only = false,
+	.ret_type = RET_PTR_TO_BTF_ID_OR_NULL,
+	.ret_btf_id = BPF_PTR_POISON,
+	.arg1_type = ARG_PTR_TO_KPTR,
+	.arg2_type = ARG_PTR_TO_BTF_ID_OR_NULL | OBJ_RELEASE,
+	.arg2_btf_id = BPF_PTR_POISON,
 };
 
 /* Since the upper 8 bits of dynptr->size is reserved, the
  * maximum supported size is 2^24 - 1.
  */
-#define DYNPTR_MAX_SIZE	((1UL << 24) - 1)
-#define DYNPTR_TYPE_SHIFT	28
-#define DYNPTR_SIZE_MASK	0xFFFFFF
-#define DYNPTR_RDONLY_BIT	BIT(31)
+#define DYNPTR_MAX_SIZE ((1UL << 24) - 1)
+#define DYNPTR_TYPE_SHIFT 28
+#define DYNPTR_SIZE_MASK 0xFFFFFF
+#define DYNPTR_RDONLY_BIT BIT(31)
 
 static bool __bpf_dynptr_is_rdonly(const struct bpf_dynptr_kern *ptr)
 {
@@ -1450,12 +1457,14 @@ void bpf_dynptr_set_rdonly(struct bpf_dynptr_kern *ptr)
 	ptr->size |= DYNPTR_RDONLY_BIT;
 }
 
-static void bpf_dynptr_set_type(struct bpf_dynptr_kern *ptr, enum bpf_dynptr_type type)
+static void bpf_dynptr_set_type(struct bpf_dynptr_kern *ptr,
+				enum bpf_dynptr_type type)
 {
 	ptr->size |= type << DYNPTR_TYPE_SHIFT;
 }
 
-static enum bpf_dynptr_type bpf_dynptr_get_type(const struct bpf_dynptr_kern *ptr)
+static enum bpf_dynptr_type
+bpf_dynptr_get_type(const struct bpf_dynptr_kern *ptr)
 {
 	return (ptr->size & ~(DYNPTR_RDONLY_BIT)) >> DYNPTR_TYPE_SHIFT;
 }
@@ -1491,7 +1500,8 @@ void bpf_dynptr_set_null(struct bpf_dynptr_kern *ptr)
 	memset(ptr, 0, sizeof(*ptr));
 }
 
-static int bpf_dynptr_check_off_len(const struct bpf_dynptr_kern *ptr, u32 offset, u32 len)
+static int bpf_dynptr_check_off_len(const struct bpf_dynptr_kern *ptr,
+				    u32 offset, u32 len)
 {
 	u32 size = __bpf_dynptr_size(ptr);
 
@@ -1501,7 +1511,8 @@ static int bpf_dynptr_check_off_len(const struct bpf_dynptr_kern *ptr, u32 offse
 	return 0;
 }
 
-BPF_CALL_4(bpf_dynptr_from_mem, void *, data, u32, size, u64, flags, struct bpf_dynptr_kern *, ptr)
+BPF_CALL_4(bpf_dynptr_from_mem, void *, data, u32, size, u64, flags,
+	   struct bpf_dynptr_kern *, ptr)
 {
 	int err;
 
@@ -1527,17 +1538,17 @@ error:
 }
 
 static const struct bpf_func_proto bpf_dynptr_from_mem_proto = {
-	.func		= bpf_dynptr_from_mem,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
-	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
-	.arg3_type	= ARG_ANYTHING,
-	.arg4_type	= ARG_PTR_TO_DYNPTR | DYNPTR_TYPE_LOCAL | MEM_UNINIT,
+	.func = bpf_dynptr_from_mem,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg2_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg3_type = ARG_ANYTHING,
+	.arg4_type = ARG_PTR_TO_DYNPTR | DYNPTR_TYPE_LOCAL | MEM_UNINIT,
 };
 
-BPF_CALL_5(bpf_dynptr_read, void *, dst, u32, len, const struct bpf_dynptr_kern *, src,
-	   u32, offset, u64, flags)
+BPF_CALL_5(bpf_dynptr_read, void *, dst, u32, len,
+	   const struct bpf_dynptr_kern *, src, u32, offset, u64, flags)
 {
 	enum bpf_dynptr_type type;
 	int err;
@@ -1561,28 +1572,31 @@ BPF_CALL_5(bpf_dynptr_read, void *, dst, u32, len, const struct bpf_dynptr_kern 
 		memmove(dst, src->data + src->offset + offset, len);
 		return 0;
 	case BPF_DYNPTR_TYPE_SKB:
-		return __bpf_skb_load_bytes(src->data, src->offset + offset, dst, len);
+		return __bpf_skb_load_bytes(src->data, src->offset + offset,
+					    dst, len);
 	case BPF_DYNPTR_TYPE_XDP:
-		return __bpf_xdp_load_bytes(src->data, src->offset + offset, dst, len);
+		return __bpf_xdp_load_bytes(src->data, src->offset + offset,
+					    dst, len);
 	default:
-		WARN_ONCE(true, "bpf_dynptr_read: unknown dynptr type %d\n", type);
+		WARN_ONCE(true, "bpf_dynptr_read: unknown dynptr type %d\n",
+			  type);
 		return -EFAULT;
 	}
 }
 
 static const struct bpf_func_proto bpf_dynptr_read_proto = {
-	.func		= bpf_dynptr_read,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
-	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
-	.arg3_type	= ARG_PTR_TO_DYNPTR | MEM_RDONLY,
-	.arg4_type	= ARG_ANYTHING,
-	.arg5_type	= ARG_ANYTHING,
+	.func = bpf_dynptr_read,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg2_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg3_type = ARG_PTR_TO_DYNPTR | MEM_RDONLY,
+	.arg4_type = ARG_ANYTHING,
+	.arg5_type = ARG_ANYTHING,
 };
 
-BPF_CALL_5(bpf_dynptr_write, const struct bpf_dynptr_kern *, dst, u32, offset, void *, src,
-	   u32, len, u64, flags)
+BPF_CALL_5(bpf_dynptr_write, const struct bpf_dynptr_kern *, dst, u32, offset,
+	   void *, src, u32, len, u64, flags)
 {
 	enum bpf_dynptr_type type;
 	int err;
@@ -1608,30 +1622,33 @@ BPF_CALL_5(bpf_dynptr_write, const struct bpf_dynptr_kern *, dst, u32, offset, v
 		memmove(dst->data + dst->offset + offset, src, len);
 		return 0;
 	case BPF_DYNPTR_TYPE_SKB:
-		return __bpf_skb_store_bytes(dst->data, dst->offset + offset, src, len,
-					     flags);
+		return __bpf_skb_store_bytes(dst->data, dst->offset + offset,
+					     src, len, flags);
 	case BPF_DYNPTR_TYPE_XDP:
 		if (flags)
 			return -EINVAL;
-		return __bpf_xdp_store_bytes(dst->data, dst->offset + offset, src, len);
+		return __bpf_xdp_store_bytes(dst->data, dst->offset + offset,
+					     src, len);
 	default:
-		WARN_ONCE(true, "bpf_dynptr_write: unknown dynptr type %d\n", type);
+		WARN_ONCE(true, "bpf_dynptr_write: unknown dynptr type %d\n",
+			  type);
 		return -EFAULT;
 	}
 }
 
 static const struct bpf_func_proto bpf_dynptr_write_proto = {
-	.func		= bpf_dynptr_write,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_DYNPTR | MEM_RDONLY,
-	.arg2_type	= ARG_ANYTHING,
-	.arg3_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg4_type	= ARG_CONST_SIZE_OR_ZERO,
-	.arg5_type	= ARG_ANYTHING,
+	.func = bpf_dynptr_write,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_DYNPTR | MEM_RDONLY,
+	.arg2_type = ARG_ANYTHING,
+	.arg3_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg4_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg5_type = ARG_ANYTHING,
 };
 
-BPF_CALL_3(bpf_dynptr_data, const struct bpf_dynptr_kern *, ptr, u32, offset, u32, len)
+BPF_CALL_3(bpf_dynptr_data, const struct bpf_dynptr_kern *, ptr, u32, offset,
+	   u32, len)
 {
 	enum bpf_dynptr_type type;
 	int err;
@@ -1657,18 +1674,19 @@ BPF_CALL_3(bpf_dynptr_data, const struct bpf_dynptr_kern *, ptr, u32, offset, u3
 		/* skb and xdp dynptrs should use bpf_dynptr_slice / bpf_dynptr_slice_rdwr */
 		return 0;
 	default:
-		WARN_ONCE(true, "bpf_dynptr_data: unknown dynptr type %d\n", type);
+		WARN_ONCE(true, "bpf_dynptr_data: unknown dynptr type %d\n",
+			  type);
 		return 0;
 	}
 }
 
 static const struct bpf_func_proto bpf_dynptr_data_proto = {
-	.func		= bpf_dynptr_data,
-	.gpl_only	= false,
-	.ret_type	= RET_PTR_TO_DYNPTR_MEM_OR_NULL,
-	.arg1_type	= ARG_PTR_TO_DYNPTR | MEM_RDONLY,
-	.arg2_type	= ARG_ANYTHING,
-	.arg3_type	= ARG_CONST_ALLOC_SIZE_OR_ZERO,
+	.func = bpf_dynptr_data,
+	.gpl_only = false,
+	.ret_type = RET_PTR_TO_DYNPTR_MEM_OR_NULL,
+	.arg1_type = ARG_PTR_TO_DYNPTR | MEM_RDONLY,
+	.arg2_type = ARG_ANYTHING,
+	.arg3_type = ARG_CONST_ALLOC_SIZE_OR_ZERO,
 };
 
 const struct bpf_func_proto bpf_get_current_task_proto __weak;
@@ -1679,8 +1697,8 @@ const struct bpf_func_proto bpf_probe_read_kernel_proto __weak;
 const struct bpf_func_proto bpf_probe_read_kernel_str_proto __weak;
 const struct bpf_func_proto bpf_task_pt_regs_proto __weak;
 
-const struct bpf_func_proto *
-bpf_base_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
+const struct bpf_func_proto *bpf_base_func_proto(enum bpf_func_id func_id,
+						 const struct bpf_prog *prog)
 {
 	switch (func_id) {
 	case BPF_FUNC_map_lookup_elem:
@@ -1727,6 +1745,8 @@ bpf_base_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_strtol_proto;
 	case BPF_FUNC_strtoul:
 		return &bpf_strtoul_proto;
+	case BPF_FUNC_schedule:
+		return &bpf_schedule_proto;
 	default:
 		break;
 	}
@@ -1803,12 +1823,14 @@ bpf_base_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_probe_read_user_proto;
 	case BPF_FUNC_probe_read_kernel:
 		return security_locked_down(LOCKDOWN_BPF_READ_KERNEL) < 0 ?
-		       NULL : &bpf_probe_read_kernel_proto;
+			       NULL :
+			       &bpf_probe_read_kernel_proto;
 	case BPF_FUNC_probe_read_user_str:
 		return &bpf_probe_read_user_str_proto;
 	case BPF_FUNC_probe_read_kernel_str:
 		return security_locked_down(LOCKDOWN_BPF_READ_KERNEL) < 0 ?
-		       NULL : &bpf_probe_read_kernel_str_proto;
+			       NULL :
+			       &bpf_probe_read_kernel_str_proto;
 	case BPF_FUNC_snprintf_btf:
 		return &bpf_snprintf_btf_proto;
 	case BPF_FUNC_snprintf:
@@ -1828,7 +1850,8 @@ void bpf_list_head_free(const struct btf_field *field, void *list_head,
 	struct list_head *head = list_head, *orig_head = list_head;
 
 	BUILD_BUG_ON(sizeof(struct list_head) > sizeof(struct bpf_list_head));
-	BUILD_BUG_ON(__alignof__(struct list_head) > __alignof__(struct bpf_list_head));
+	BUILD_BUG_ON(__alignof__(struct list_head) >
+		     __alignof__(struct bpf_list_head));
 
 	/* Do the actual list draining outside the lock to not hold the lock for
 	 * too long, and also prevent deadlocks if tracing programs end up
@@ -1867,9 +1890,12 @@ unlock:
  * or type of node struct
  */
 #define bpf_rbtree_postorder_for_each_entry_safe(pos, n, root) \
-	for (pos = rb_first_postorder(root); \
-	    pos && ({ n = rb_next_postorder(pos); 1; }); \
-	    pos = n)
+	for (pos = rb_first_postorder(root);                   \
+	     pos && ({                                         \
+		     n = rb_next_postorder(pos);               \
+		     1;                                        \
+	     });                                               \
+	     pos = n)
 
 void bpf_rb_root_free(const struct btf_field *field, void *rb_root,
 		      struct bpf_spin_lock *spin_lock)
@@ -1878,18 +1904,20 @@ void bpf_rb_root_free(const struct btf_field *field, void *rb_root,
 	struct rb_node *pos, *n;
 	void *obj;
 
-	BUILD_BUG_ON(sizeof(struct rb_root_cached) > sizeof(struct bpf_rb_root));
-	BUILD_BUG_ON(__alignof__(struct rb_root_cached) > __alignof__(struct bpf_rb_root));
+	BUILD_BUG_ON(sizeof(struct rb_root_cached) >
+		     sizeof(struct bpf_rb_root));
+	BUILD_BUG_ON(__alignof__(struct rb_root_cached) >
+		     __alignof__(struct bpf_rb_root));
 
 	__bpf_spin_lock_irqsave(spin_lock);
 	orig_root = *root;
 	*root = RB_ROOT_CACHED;
 	__bpf_spin_unlock_irqrestore(spin_lock);
 
-	bpf_rbtree_postorder_for_each_entry_safe(pos, n, &orig_root.rb_root) {
+	bpf_rbtree_postorder_for_each_entry_safe(pos, n, &orig_root.rb_root)
+	{
 		obj = pos;
 		obj -= field->graph_root.node_offset;
-
 
 		migrate_disable();
 		__bpf_obj_drop_impl(obj, field->graph_root.value_rec, false);
@@ -1958,7 +1986,8 @@ __bpf_kfunc void bpf_percpu_obj_drop_impl(void *p__alloc, void *meta__ign)
 	bpf_mem_free_rcu(&bpf_global_percpu_ma, p__alloc);
 }
 
-__bpf_kfunc void *bpf_refcount_acquire_impl(void *p__refcounted_kptr, void *meta__ign)
+__bpf_kfunc void *bpf_refcount_acquire_impl(void *p__refcounted_kptr,
+					    void *meta__ign)
 {
 	struct btf_struct_meta *meta = meta__ign;
 	struct bpf_refcount *ref;
@@ -1966,7 +1995,8 @@ __bpf_kfunc void *bpf_refcount_acquire_impl(void *p__refcounted_kptr, void *meta
 	/* Could just cast directly to refcount_t *, but need some code using
 	 * bpf_refcount type so that it is emitted in vmlinux BTF
 	 */
-	ref = (struct bpf_refcount *)(p__refcounted_kptr + meta->record->refcount_off);
+	ref = (struct bpf_refcount *)(p__refcounted_kptr +
+				      meta->record->refcount_off);
 	if (!refcount_inc_not_zero((refcount_t *)ref))
 		return NULL;
 
@@ -1977,8 +2007,8 @@ __bpf_kfunc void *bpf_refcount_acquire_impl(void *p__refcounted_kptr, void *meta
 }
 
 static int __bpf_list_add(struct bpf_list_node_kern *node,
-			  struct bpf_list_head *head,
-			  bool tail, struct btf_record *rec, u64 off)
+			  struct bpf_list_head *head, bool tail,
+			  struct btf_record *rec, u64 off)
 {
 	struct list_head *n = &node->list_head, *h = (void *)head;
 
@@ -2023,7 +2053,8 @@ __bpf_kfunc int bpf_list_push_back_impl(struct bpf_list_head *head,
 	return __bpf_list_add(n, head, true, meta ? meta->record : NULL, off);
 }
 
-static struct bpf_list_node *__bpf_list_del(struct bpf_list_head *head, bool tail)
+static struct bpf_list_node *__bpf_list_del(struct bpf_list_head *head,
+					    bool tail)
 {
 	struct list_head *n, *h = (void *)head;
 	struct bpf_list_node_kern *node;
@@ -2059,7 +2090,8 @@ __bpf_kfunc struct bpf_list_node *bpf_list_pop_back(struct bpf_list_head *head)
 __bpf_kfunc struct bpf_rb_node *bpf_rbtree_remove(struct bpf_rb_root *root,
 						  struct bpf_rb_node *node)
 {
-	struct bpf_rb_node_kern *node_internal = (struct bpf_rb_node_kern *)node;
+	struct bpf_rb_node_kern *node_internal =
+		(struct bpf_rb_node_kern *)node;
 	struct rb_root_cached *r = (struct rb_root_cached *)root;
 	struct rb_node *n = &node_internal->rb_node;
 
@@ -2079,10 +2111,11 @@ __bpf_kfunc struct bpf_rb_node *bpf_rbtree_remove(struct bpf_rb_root *root,
  * program
  */
 static int __bpf_rbtree_add(struct bpf_rb_root *root,
-			    struct bpf_rb_node_kern *node,
-			    void *less, struct btf_record *rec, u64 off)
+			    struct bpf_rb_node_kern *node, void *less,
+			    struct btf_record *rec, u64 off)
 {
-	struct rb_node **link = &((struct rb_root_cached *)root)->rb_root.rb_node;
+	struct rb_node **link =
+		&((struct rb_root_cached *)root)->rb_root.rb_node;
 	struct rb_node *parent = NULL, *n = &node->rb_node;
 	bpf_callback_t cb = (bpf_callback_t)less;
 	bool leftmost = true;
@@ -2112,14 +2145,17 @@ static int __bpf_rbtree_add(struct bpf_rb_root *root,
 	return 0;
 }
 
-__bpf_kfunc int bpf_rbtree_add_impl(struct bpf_rb_root *root, struct bpf_rb_node *node,
-				    bool (less)(struct bpf_rb_node *a, const struct bpf_rb_node *b),
+__bpf_kfunc int bpf_rbtree_add_impl(struct bpf_rb_root *root,
+				    struct bpf_rb_node *node,
+				    bool(less)(struct bpf_rb_node *a,
+					       const struct bpf_rb_node *b),
 				    void *meta__ign, u64 off)
 {
 	struct btf_struct_meta *meta = meta__ign;
 	struct bpf_rb_node_kern *n = (void *)node;
 
-	return __bpf_rbtree_add(root, n, (void *)less, meta ? meta->record : NULL, off);
+	return __bpf_rbtree_add(root, n, (void *)less,
+				meta ? meta->record : NULL, off);
 }
 
 __bpf_kfunc struct bpf_rb_node *bpf_rbtree_first(struct bpf_rb_root *root)
@@ -2254,8 +2290,8 @@ __bpf_kfunc long bpf_task_under_cgroup(struct task_struct *task,
  *
  * On success, the cgroup is returen. On failure, NULL is returned.
  */
-__bpf_kfunc struct cgroup *
-bpf_task_get_cgroup1(struct task_struct *task, int hierarchy_id)
+__bpf_kfunc struct cgroup *bpf_task_get_cgroup1(struct task_struct *task,
+						int hierarchy_id)
 {
 	struct cgroup *cgrp = task_get_cgroup1(task, hierarchy_id);
 
@@ -2312,8 +2348,9 @@ __bpf_kfunc struct task_struct *bpf_task_from_pid(s32 pid)
  * provided buffer, with its contents containing the data, if unable to obtain
  * direct pointer)
  */
-__bpf_kfunc void *bpf_dynptr_slice(const struct bpf_dynptr_kern *ptr, u32 offset,
-				   void *buffer__opt, u32 buffer__szk)
+__bpf_kfunc void *bpf_dynptr_slice(const struct bpf_dynptr_kern *ptr,
+				   u32 offset, void *buffer__opt,
+				   u32 buffer__szk)
 {
 	enum bpf_dynptr_type type;
 	u32 len = buffer__szk;
@@ -2334,18 +2371,22 @@ __bpf_kfunc void *bpf_dynptr_slice(const struct bpf_dynptr_kern *ptr, u32 offset
 		return ptr->data + ptr->offset + offset;
 	case BPF_DYNPTR_TYPE_SKB:
 		if (buffer__opt)
-			return skb_header_pointer(ptr->data, ptr->offset + offset, len, buffer__opt);
+			return skb_header_pointer(ptr->data,
+						  ptr->offset + offset, len,
+						  buffer__opt);
 		else
-			return skb_pointer_if_linear(ptr->data, ptr->offset + offset, len);
-	case BPF_DYNPTR_TYPE_XDP:
-	{
-		void *xdp_ptr = bpf_xdp_pointer(ptr->data, ptr->offset + offset, len);
+			return skb_pointer_if_linear(ptr->data,
+						     ptr->offset + offset, len);
+	case BPF_DYNPTR_TYPE_XDP: {
+		void *xdp_ptr =
+			bpf_xdp_pointer(ptr->data, ptr->offset + offset, len);
 		if (!IS_ERR_OR_NULL(xdp_ptr))
 			return xdp_ptr;
 
 		if (!buffer__opt)
 			return NULL;
-		bpf_xdp_copy_buf(ptr->data, ptr->offset + offset, buffer__opt, len, false);
+		bpf_xdp_copy_buf(ptr->data, ptr->offset + offset, buffer__opt,
+				 len, false);
 		return buffer__opt;
 	}
 	default:
@@ -2396,8 +2437,9 @@ __bpf_kfunc void *bpf_dynptr_slice(const struct bpf_dynptr_kern *ptr, u32 offset
  * provided buffer, with its contents containing the data, if unable to obtain
  * direct pointer)
  */
-__bpf_kfunc void *bpf_dynptr_slice_rdwr(const struct bpf_dynptr_kern *ptr, u32 offset,
-					void *buffer__opt, u32 buffer__szk)
+__bpf_kfunc void *bpf_dynptr_slice_rdwr(const struct bpf_dynptr_kern *ptr,
+					u32 offset, void *buffer__opt,
+					u32 buffer__szk)
 {
 	if (!ptr->data || __bpf_dynptr_is_rdonly(ptr))
 		return NULL;
@@ -2427,7 +2469,8 @@ __bpf_kfunc void *bpf_dynptr_slice_rdwr(const struct bpf_dynptr_kern *ptr, u32 o
 	return bpf_dynptr_slice(ptr, offset, buffer__opt, buffer__szk);
 }
 
-__bpf_kfunc int bpf_dynptr_adjust(struct bpf_dynptr_kern *ptr, u32 start, u32 end)
+__bpf_kfunc int bpf_dynptr_adjust(struct bpf_dynptr_kern *ptr, u32 start,
+				  u32 end)
 {
 	u32 size;
 
@@ -2577,9 +2620,8 @@ BTF_KFUNCS_END(generic_btf_ids)
 
 static const struct btf_kfunc_id_set generic_kfunc_set = {
 	.owner = THIS_MODULE,
-	.set   = &generic_btf_ids,
+	.set = &generic_btf_ids,
 };
-
 
 BTF_ID_LIST(generic_dtor_ids)
 BTF_ID(struct, task_struct)
@@ -2606,11 +2648,13 @@ BTF_ID_FLAGS(func, bpf_iter_task_vma_destroy, KF_ITER_DESTROY)
 BTF_ID_FLAGS(func, bpf_iter_css_task_new, KF_ITER_NEW | KF_TRUSTED_ARGS)
 BTF_ID_FLAGS(func, bpf_iter_css_task_next, KF_ITER_NEXT | KF_RET_NULL)
 BTF_ID_FLAGS(func, bpf_iter_css_task_destroy, KF_ITER_DESTROY)
-BTF_ID_FLAGS(func, bpf_iter_css_new, KF_ITER_NEW | KF_TRUSTED_ARGS | KF_RCU_PROTECTED)
+BTF_ID_FLAGS(func, bpf_iter_css_new,
+	     KF_ITER_NEW | KF_TRUSTED_ARGS | KF_RCU_PROTECTED)
 BTF_ID_FLAGS(func, bpf_iter_css_next, KF_ITER_NEXT | KF_RET_NULL)
 BTF_ID_FLAGS(func, bpf_iter_css_destroy, KF_ITER_DESTROY)
 #endif
-BTF_ID_FLAGS(func, bpf_iter_task_new, KF_ITER_NEW | KF_TRUSTED_ARGS | KF_RCU_PROTECTED)
+BTF_ID_FLAGS(func, bpf_iter_task_new,
+	     KF_ITER_NEW | KF_TRUSTED_ARGS | KF_RCU_PROTECTED)
 BTF_ID_FLAGS(func, bpf_iter_task_next, KF_ITER_NEXT | KF_RET_NULL)
 BTF_ID_FLAGS(func, bpf_iter_task_destroy, KF_ITER_DESTROY)
 BTF_ID_FLAGS(func, bpf_dynptr_adjust)
@@ -2622,33 +2666,39 @@ BTF_KFUNCS_END(common_btf_ids)
 
 static const struct btf_kfunc_id_set common_kfunc_set = {
 	.owner = THIS_MODULE,
-	.set   = &common_btf_ids,
+	.set = &common_btf_ids,
 };
 
 static int __init kfunc_init(void)
 {
 	int ret;
 	const struct btf_id_dtor_kfunc generic_dtors[] = {
-		{
-			.btf_id       = generic_dtor_ids[0],
-			.kfunc_btf_id = generic_dtor_ids[1]
-		},
+		{ .btf_id = generic_dtor_ids[0],
+		  .kfunc_btf_id = generic_dtor_ids[1] },
 #ifdef CONFIG_CGROUPS
-		{
-			.btf_id       = generic_dtor_ids[2],
-			.kfunc_btf_id = generic_dtor_ids[3]
-		},
+		{ .btf_id = generic_dtor_ids[2],
+		  .kfunc_btf_id = generic_dtor_ids[3] },
 #endif
 	};
 
-	ret = register_btf_kfunc_id_set(BPF_PROG_TYPE_TRACING, &generic_kfunc_set);
-	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_SCHED_CLS, &generic_kfunc_set);
-	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_XDP, &generic_kfunc_set);
-	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS, &generic_kfunc_set);
-	ret = ret ?: register_btf_id_dtor_kfuncs(generic_dtors,
+	ret = register_btf_kfunc_id_set(BPF_PROG_TYPE_TRACING,
+					&generic_kfunc_set);
+	ret = ret   ?:
+		      register_btf_kfunc_id_set(BPF_PROG_TYPE_SCHED_CLS,
+						&generic_kfunc_set);
+	ret = ret   ?:
+		      register_btf_kfunc_id_set(BPF_PROG_TYPE_XDP,
+						&generic_kfunc_set);
+	ret = ret   ?:
+		      register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS,
+						&generic_kfunc_set);
+	ret = ret   ?:
+		      register_btf_id_dtor_kfuncs(generic_dtors,
 						  ARRAY_SIZE(generic_dtors),
 						  THIS_MODULE);
-	return ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_UNSPEC, &common_kfunc_set);
+	return ret   ?:
+		       register_btf_kfunc_id_set(BPF_PROG_TYPE_UNSPEC,
+						 &common_kfunc_set);
 }
 
 late_initcall(kfunc_init);
