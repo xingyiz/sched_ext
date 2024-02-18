@@ -23,7 +23,8 @@ const char help_fmt[] =
 	"\n"
 	"  -s            Enter seed for the RNG. Default: 0xdeadbeef.\n"
 	"  -d            Enter depth of bug to search for. Default: 3.\n"
-	"  -h            Display this help and exit\n";
+	"  -h            Display this help and exit\n"
+	"  -r            Use random walk instead of PCT";
 
 static volatile int exit_req;
 
@@ -72,7 +73,7 @@ int main(int argc, char **argv)
 	skel = scx_serialise__open();
 	SCX_BUG_ON(!skel, "Failed to open skel");
 
-	while ((opt = getopt(argc, argv, "s:d:h")) != -1) {
+	while ((opt = getopt(argc, argv, "s:d:hr")) != -1) {
 		unsigned long v;
 
 		switch (opt) {
@@ -90,7 +91,10 @@ int main(int argc, char **argv)
 				skel->rodata->depth = (__u32)v;
 			}
 			break;
-
+		case 'r':
+			skel->rodata->use_random_walk = 1;
+			skel->rodata->use_pct = 0;
+			break;
 		case 'h':
 		default:
 			fprintf(stderr, help_fmt, basename(argv[0]));
