@@ -44,7 +44,7 @@ static void stat_inc(u32 idx)
 #define MAX_THREADS 95
 
 /* Debugging macros */
-const volatile u32 debug = 2;
+const volatile u32 debug = 1;
 
 #define warn(fmt, args...) bpf_printk(fmt, ##args)
 
@@ -285,12 +285,6 @@ static inline bool is_sched_ext(const struct task_struct *p)
 
 	return policy == SCHED_EXT;
 }
-
-/*
- * Udelay is called too often to trigger a reschedule every time it is called.
- * Instead, we trigger a reschedule every 300 calls to udelay.
- */
-u32 udelay_schedule_counter = 0;
 
 /*
  * Variables for PCT implementation
@@ -804,7 +798,6 @@ s32 BPF_STRUCT_OPS_SLEEPABLE(serialise_init)
 	dbg("[init] scx_serialise init LMAO TEST \n");
 
 	int status;
-	udelay_schedule_counter = 0;
 
 	status = heartbeat_timer_init();
 	if (status) {
@@ -859,17 +852,62 @@ struct sched_ext_ops serialise_ops = {
 /* =================================
  * Hooks
  * ================================= */
-SEC("kprobe/__udelay")
-int BPF_KPROBE(udelay_probe)
+/*
+ * Udelay is called too often to trigger a reschedule every time it is called.
+ * Instead, we trigger a reschedule every 300 calls to udelay.
+ */
+
+// u32 udelay_schedule_counter = 0;
+// SEC("kprobe/__udelay")
+// int BPF_KPROBE(udelay_probe)
+// {
+// 	struct task_struct *p = (struct task_struct *)bpf_get_current_task();
+// 	if (!is_sched_ext(p))
+// 		return 0;
+
+// 	__sync_fetch_and_add(&udelay_schedule_counter, 1);
+// 	if (udelay_schedule_counter == 300) {
+// 		udelay_schedule_counter = 0;
+// 		dbg("[udelay_probe] bpf schedule called\n");
+// 		bpf_schedule();
+// 	}
+// 	return 0;
+// }
+
+u32 kmalloc_schedule_counter = 0;
+SEC("kprobe/__kmalloc")
+int BPF_KPROBE(kmalloc_probe)
 {
 	struct task_struct *p = (struct task_struct *)bpf_get_current_task();
 	if (!is_sched_ext(p))
 		return 0;
 
-	__sync_fetch_and_add(&udelay_schedule_counter, 1);
-	if (udelay_schedule_counter == 300) {
-		udelay_schedule_counter = 0;
-		dbg("[udelay_probe] bpf schedule called\n");
+	__sync_fetch_and_add(&kmalloc_schedule_counter, 1);
+	dbg("[kmalloc_probe] pid: %d\n", (u32)bpf_get_current_pid_tgid());
+
+	if (kmalloc_schedule_counter == 5) {
+		kmalloc_schedule_counter = 0;
+		dbg("[kmalloc_probe] bpf schedule called\n");
+		bpf_schedule();
+	}
+
+	return 0;
+}
+
+u32 kfree_schedule_counter = 0;
+SEC("kprobe/kfree")
+int BPF_KPROBE(kfree_probe)
+{
+	struct task_struct *p = (struct task_struct *)bpf_get_current_task();
+	if (!is_sched_ext(p))
+		return 0;
+
+	__sync_fetch_and_add(&kfree_schedule_counter, 1);
+	dbg("[kfree_probe] pid: %d\n", (u32)bpf_get_current_pid_tgid());
+
+	if (kfree_schedule_counter == 8) {
+		kfree_schedule_counter = 0;
+		dbg("[kfree_probe] bpf schedule called\n");
 		bpf_schedule();
 	}
 	return 0;
