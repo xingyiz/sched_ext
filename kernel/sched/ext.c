@@ -564,8 +564,8 @@ static bool ops_cpu_valid(s32 cpu)
  * @err: -errno value to sanitize
  *
  * Verify @err is a valid -errno. If not, trigger scx_ops_error() and return
- * -%EPROTO. This is necessary because returning a rogue -errno up the chain
- * can cause misbehaviors. For an example, a large negative return from
+ * -%EPROTO. This is necessary because returning a rogue -errno up the chain can
+ * cause misbehaviors. For an example, a large negative return from
  * ops.init_task() triggers an oops when passed up the call chain because the
  * value fails IS_ERR() test after being encoded with ERR_PTR() and then is
  * handled as a pointer.
@@ -1643,7 +1643,7 @@ static int balance_one(struct rq *rq, struct task_struct *prev,
 		 * implement ->cpu_released().
 		 *
 		 * See scx_ops_disable_workfn() for the explanation on the
-		 * disabling() test.
+		 * bypassing test.
 		 *
 		 * When balancing a remote CPU for core-sched, there won't be a
 		 * following put_prev_task_scx() call and we don't own
@@ -2500,6 +2500,7 @@ static void scx_ops_exit_task(struct task_struct *p)
 	};
 
 	lockdep_assert_rq_held(task_rq(p));
+
 	switch (scx_get_task_state(p)) {
 	case SCX_TASK_NONE:
 		return;
@@ -2546,6 +2547,7 @@ void scx_post_fork(struct task_struct *p)
 {
 	if (scx_enabled()) {
 		scx_set_task_state(p, SCX_TASK_READY);
+
 		/*
 		 * Enable the task immediately if it's running on sched_ext.
 		 * Otherwise, it'll be enabled in switching_to_scx() if and
@@ -2579,6 +2581,7 @@ void scx_cancel_fork(struct task_struct *p)
 		scx_ops_exit_task(p);
 		task_rq_unlock(rq, p, &rf);
 	}
+
 	percpu_up_read(&scx_fork_rwsem);
 }
 
@@ -3229,10 +3232,10 @@ bool task_should_scx(struct task_struct *p)
  *
  * d. pick_next_task() suppresses zero slice warning.
  *
- * e. scx_prio_less() reverts to the default core_sched_at order.
- *
- * f. scx_bpf_kick_cpu() is disabled to avoid irq_work malfunction during PM
+ * e. scx_bpf_kick_cpu() is disabled to avoid irq_work malfunction during PM
  *    operations.
+ *
+ * f. scx_prio_less() reverts to the default core_sched_at order.
  */
 static void scx_ops_bypass(bool bypass)
 {
@@ -3449,6 +3452,7 @@ static void scx_ops_disable_workfn(struct kthread_work *work)
 		SCX_CALL_OP(SCX_KF_UNLOCKED, exit, ei);
 
 	cancel_delayed_work_sync(&scx_watchdog_work);
+
 	/*
 	 * Delete the kobject from the hierarchy eagerly in addition to just
 	 * dropping a reference. Otherwise, if the object is deleted
@@ -3594,6 +3598,10 @@ static void scx_dump_state(struct scx_exit_info *ei)
 		if (!cpumask_empty(rq->scx.cpus_to_kick))
 			seq_buf_printf(&s, "  cpus_to_kick   : %*pb\n",
 				       cpumask_pr_args(rq->scx.cpus_to_kick));
+		if (!cpumask_empty(rq->scx.cpus_to_kick_if_idle))
+			seq_buf_printf(
+				&s, "  idle_to_kick   : %*pb\n",
+				cpumask_pr_args(rq->scx.cpus_to_kick_if_idle));
 		if (!cpumask_empty(rq->scx.cpus_to_preempt))
 			seq_buf_printf(
 				&s, "  cpus_to_preempt: %*pb\n",
@@ -3962,6 +3970,7 @@ err_disable:
  */
 #include <linux/bpf_verifier.h>
 #include <linux/bpf.h>
+#include <linux/btf.h>
 
 extern struct btf *btf_vmlinux;
 static const struct btf_type *task_struct_type;
@@ -3997,7 +4006,7 @@ static bool promote_dispatch_2nd_arg(int off, int size,
 	 * Get the member name of this struct_ops program, which corresponds to
 	 * a field in struct sched_ext_ops. For example, the member name of the
 	 * dispatch struct_ops program (callback) is "dispatch".
-         */
+	 */
 	member = &btf_type_member(t)[member_idx];
 	mname = btf_name_by_offset(btf_vmlinux, member->name_off);
 
@@ -4006,7 +4015,7 @@ static bool promote_dispatch_2nd_arg(int off, int size,
 	 * "dispatch" in struct sched_ext_ops. The arguments of struct_ops
 	 * operators are sequential and 64-bit, so the second argument is at
 	 * offset sizeof(__u64).
-         */
+	 */
 	if (strcmp(mname, "dispatch") == 0 && off == sizeof(__u64)) {
 		/*
 		 * The value is a pointer to a type (struct task_struct) given
@@ -4017,7 +4026,7 @@ static bool promote_dispatch_2nd_arg(int off, int size,
 		 *
 		 * Longer term, this is something that should be addressed by
 		 * BTF, and be fully contained within the verifier.
-                 */
+		 */
 		info->reg_type = PTR_MAYBE_NULL | PTR_TO_BTF_ID | PTR_TRUSTED;
 		info->btf = btf_vmlinux;
 		info->btf_id = task_struct_type_id;
@@ -4118,7 +4127,8 @@ static int bpf_scx_init_member(const struct btf_type *t,
 			return -EINVAL;
 		return 1;
 	case offsetof(struct sched_ext_ops, timeout_ms):
-		if (*(u32 *)(udata + moff) > SCX_WATCHDOG_MAX_TIMEOUT)
+		if (msecs_to_jiffies(*(u32 *)(udata + moff)) >
+		    SCX_WATCHDOG_MAX_TIMEOUT)
 			return -E2BIG;
 		ops->timeout_ms = *(u32 *)(udata + moff);
 		return 1;
@@ -4180,9 +4190,9 @@ static int bpf_scx_update(void *kdata, void *old_kdata)
 	/*
 	 * sched_ext does not support updating the actively-loaded BPF
 	 * scheduler, as registering a BPF scheduler can always fail if the
-	 * scheduler returns an error code for e.g. ops.init(),
-	 * ops.init_task(), etc. Similarly, we can always race with
-	 * unregistration happening elsewhere, such as with sysrq.
+	 * scheduler returns an error code for e.g. ops.init(), ops.init_task(),
+	 * etc. Similarly, we can always race with unregistration happening
+	 * elsewhere, such as with sysrq.
 	 */
 	return -EOPNOTSUPP;
 }
