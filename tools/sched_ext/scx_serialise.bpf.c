@@ -475,11 +475,12 @@ static void choose_change_points(struct xorshift32_state *state)
  * C program based on user-defined parameters.
  */
 const volatile int use_random_walk = 0;
+const volatile int use_random_walk_2 = 0;
 
 /*
  * Assign the priority for a thread based on a completely random number.
  */
-s32 assign_rw_priority(pid_t pid)
+static inline s32 assign_rw_priority(pid_t pid)
 {
 	s32 priority = bpf_get_prandom_u32() % MAX_THREADS;
 	return priority;
@@ -491,7 +492,7 @@ s32 assign_rw_priority(pid_t pid)
  */
 s32 assign_priority(pid_t pid)
 {
-	if (use_random_walk)
+	if (use_random_walk || use_random_walk_2)
 		return assign_rw_priority(pid);
 
 	if (use_pct)
@@ -501,6 +502,25 @@ s32 assign_priority(pid_t pid)
 	scx_bpf_error(
 		"[assign_priority] ERROR: no scheduling algorithm chosen\n");
 	return -2;
+}
+
+/*
+ * Callback function to update all priorities in tctx_map for random_walk_2
+ */
+static __u64 update_all_prios(struct bpf_map *map, pid_t *key,
+			      struct task_ctx *tctx,
+			      struct tctx_callback_ctx *tcallbackctx)
+{
+	/* Use highest_priority_pid to indicate the pid of the task we have already updated */
+	pid_t pid_to_avoid = tcallbackctx->highest_priority_pid;
+	s32 new_priority;
+	if (*key != pid_to_avoid) {
+		new_priority = assign_priority(*key);
+		bpf_spin_lock(&tctx->lock);
+		tctx->priority = new_priority;
+		bpf_spin_unlock(&tctx->lock);
+	}
+	return 0;
 }
 
 // static __u64 dump_error(struct bpf_map *map, pid_t *key, struct task_ctx *tctx, struct tctx_callback_ctx *tcallbackctx) {
@@ -584,6 +604,16 @@ void BPF_STRUCT_OPS(serialise_enqueue, struct task_struct *p, u64 enq_flags)
 	 * get enqueued), we set should_exist to false.
 	 */
 	tctx_map_insert(pid, priority, true, false);
+
+	if (use_random_walk_2) {
+		/* Update the priorities of the rest of the threads as well */
+		struct tctx_callback_ctx tcallbackctx = {
+			.highest_priority_pid = pid,
+		};
+
+		bpf_for_each_map_elem(&task_ctx_map, update_all_prios,
+				      &tcallbackctx, 0);
+	}
 }
 
 /*
