@@ -541,13 +541,15 @@ void BPF_STRUCT_OPS(serialise_enqueue, struct task_struct *p, u64 enq_flags)
 	    enq_flags);
 
 		// READ TASK SLICE
+		// Is there something on the task struct that will tell us we are in a spin lock?
+	  // Need to investigate other fields. Can comment out
 		struct sched_entity se;
 		if (p != NULL) {
 	    long status = bpf_probe_read_kernel(&se, sizeof(se), &p->se);
 			if (status) {
-				dbg("[enqueue] slice status %ld\n", status);
+				dbg("[enqueue] task_struct read status %ld\n", status);
 			} else {
-				dbg("[enqueue] %d slice remaining\n", se.sum_exec_runtime);
+				dbg("[enqueue] %d total exec time\n", se.sum_exec_runtime);
 			}
 		}
 
@@ -596,8 +598,8 @@ void BPF_STRUCT_OPS(serialise_enqueue, struct task_struct *p, u64 enq_flags)
 					// If we have observed more events than expected, resume PCT with a
 					// new "strata" -- this allows for threads set to low priority to recover
 					if (initial_max_num_events * (strata + 1) < num_events) {
-							dbg("[enqueue] NEW STRATA %d\n", strata);
-						  strata += 1;
+						dbg("[enqueue] NEW STRATA %d\n", strata);
+						strata += 1;
 					}
 
 					priority = get_strata_base() + i + 1;
@@ -761,7 +763,7 @@ bool BPF_STRUCT_OPS(serialise_yield, struct task_struct *from,
 
 void BPF_STRUCT_OPS(serialise_runnable, struct task_struct *p, u64 enq_flags)
 {
-	dbg("[runnable] pid: %d\n", p->pid);
+	trace("[runnable] pid: %d\n", p->pid);
 }
 
 void BPF_STRUCT_OPS(serialise_running, struct task_struct *p)
@@ -826,10 +828,10 @@ void BPF_STRUCT_OPS(serialise_exit_task, struct task_struct *p,
   pid_t ppid = 0;
 
   long status = bpf_probe_read_kernel(&ptask, sizeof(ptask), &p->real_parent);
-  bool is_root_proc = false;
+	bool is_root_proc = false;
   if (status == 0) {
-      status = bpf_probe_read_kernel(&ppid, sizeof(ppid), &ptask->pid);
-      is_root_proc = !is_sched_ext(ptask);
+		status = bpf_probe_read_kernel(&ppid, sizeof(ppid), &ptask->pid);
+		is_root_proc = !is_sched_ext(ptask);
   } else {
       dbg("[do_exit] status failed on read parent task: %ld\n", status);
   }
@@ -874,13 +876,13 @@ s32 BPF_STRUCT_OPS_SLEEPABLE(serialise_init)
 {
 	dbg("[init] scx_serialise init LMAO TEST \n");
 
-	// int status;
+	int status;
 
-	// status = heartbeat_timer_init();
-	// if (status) {
-	// 	warn("[init] failed to init heartbeat timer\n");
-	// 	return status;
-	// }
+	status = heartbeat_timer_init();
+	if (status) {
+		warn("[init] failed to init heartbeat timer\n");
+		return status;
+	}
 
 	/* Initialise PCT variables */
 	if (use_pct) {
@@ -959,48 +961,41 @@ struct sched_ext_ops serialise_ops = {
 // 	return 0;
 // }
 
-// u32 kmalloc_schedule_counter = 0;
-// SEC("kprobe/__kmalloc")
-// int BPF_KPROBE(kmalloc_probe)
-// {
-// 	struct task_struct *p = (struct task_struct *)bpf_get_current_task();
-// 	if (!is_sched_ext(p))
-// 		return 0;
+u32 kmalloc_schedule_counter = 0;
+SEC("kprobe/__kmalloc")
+int BPF_KPROBE(kmalloc_probe)
+{
+	struct task_struct *p = (struct task_struct *)bpf_get_current_task();
+	if (!is_sched_ext(p))
+		return 0;
 
-// 	__sync_fetch_and_add(&kmalloc_schedule_counter, 1);
-// 	dbg("[kmalloc_probe] pid: %d\n", (u32)bpf_get_current_pid_tgid());
+	__sync_fetch_and_add(&kmalloc_schedule_counter, 1);
+	dbg("[kmalloc_probe] pid: %d\n", (u32)bpf_get_current_pid_tgid());
 
-// 	if (kmalloc_schedule_counter == 5) {
-// 		kmalloc_schedule_counter = 0;
-// 		dbg("[kmalloc_probe] bpf schedule called\n");
-// 		bpf_schedule();
-// 	}
+	if (kmalloc_schedule_counter == 5) {
+		kmalloc_schedule_counter = 0;
+		dbg("[kmalloc_probe] bpf schedule called\n");
+		bpf_schedule();
+	}
 
-// 	return 0;
-// }
+	return 0;
+}
 
-// u32 kfree_schedule_counter = 0;
-// SEC("kprobe/kfree")
-// int BPF_KPROBE(kfree_probe)
-// {
-// 	struct task_struct *p = (struct task_struct *)bpf_get_current_task();
-// 	if (!is_sched_ext(p))
-// 		return 0;
+u32 kfree_schedule_counter = 0;
+SEC("kprobe/kfree")
+int BPF_KPROBE(kfree_probe)
+{
+	struct task_struct *p = (struct task_struct *)bpf_get_current_task();
+	if (!is_sched_ext(p))
+		return 0;
 
-// 	__sync_fetch_and_add(&kfree_schedule_counter, 1);
-// 	dbg("[kfree_probe] pid: %d\n", (u32)bpf_get_current_pid_tgid());
+	__sync_fetch_and_add(&kfree_schedule_counter, 1);
+	dbg("[kfree_probe] pid: %d\n", (u32)bpf_get_current_pid_tgid());
 
-// 	if (kfree_schedule_counter == 8) {
-// 		kfree_schedule_counter = 0;
-// 		dbg("[kfree_probe] bpf schedule called\n");
-// 		bpf_schedule();
-// 	}
-// 	return 0;
-// }
-	// int status;
-
-	// status = heartbeat_timer_init();
-	// if (status) {
-	// 	warn("[init] failed to init heartbeat timer\n");
-	// 	return status;
-	// }
+	if (kfree_schedule_counter == 8) {
+		kfree_schedule_counter = 0;
+		dbg("[kfree_probe] bpf schedule called\n");
+		bpf_schedule();
+	}
+	return 0;
+}
