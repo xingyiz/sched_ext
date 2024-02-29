@@ -825,16 +825,16 @@ void BPF_STRUCT_OPS(serialise_exit_task, struct task_struct *p,
 	task_count -= 1;
 
 	struct task_struct *ptask;
-  pid_t ppid = 0;
+	pid_t ppid = 0;
 
-  long status = bpf_probe_read_kernel(&ptask, sizeof(ptask), &p->real_parent);
+	long status = bpf_probe_read_kernel(&ptask, sizeof(ptask), &p->real_parent);
 	bool is_root_proc = false;
-  if (status == 0) {
+	if (status == 0) {
 		status = bpf_probe_read_kernel(&ppid, sizeof(ppid), &ptask->pid);
 		is_root_proc = !is_sched_ext(ptask);
-  } else {
-      dbg("[do_exit] status failed on read parent task: %ld\n", status);
-  }
+	} else {
+		dbg("[do_exit] status failed on read parent task: %ld\n", status);
+	}
 
 	if (p->pid != p->tgid) {
 		dbg("[exit_task] THREAD pid: %d, tgid: %d\n", p->pid, p->tgid);
