@@ -794,8 +794,25 @@ void BPF_STRUCT_OPS(serialise_exit_task, struct task_struct *p,
 	if (!is_sched_ext(p))
 		return;
 
-	if (p->pid == p->tgid) {
-		dbg("[exit_task] PROCESS pid: %d, tgid: %d\n", p->pid, p->tgid);
+
+	struct task_struct *ptask;
+	pid_t ppid = 0;
+	bool is_root_proc = false;
+
+	long status = bpf_probe_read_kernel(&ptask, sizeof(ptask), &p->real_parent);
+	if (status == 0) {
+		status = bpf_probe_read_kernel(&ppid, sizeof(ppid), &ptask->pid);
+		is_root_proc = !is_sched_ext(ptask);
+	} else {
+		dbg("[exit_task] status failed on read parent task: %ld\n", status);
+	}
+
+	if (p->pid != p->tgid) {
+		dbg("[exit_task] THREAD pid: %d, tgid: %d\n", p->pid, p->tgid);
+	} else if (!is_root_proc) {
+		dbg("[exit_task] VANILLA PROCESS pid: %d, tgid: %d\n", p->pid, p->tgid);
+	} else {
+		dbg("[exit_task] ROOT PROCESS pid: %d, tgid: %d\n", p->pid, p->tgid);
 
 		if (use_pct) {
 			__sync_fetch_and_add(&iterations, 1);
