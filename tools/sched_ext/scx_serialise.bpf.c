@@ -955,6 +955,27 @@ struct sched_ext_ops serialise_ops = {
 /* =================================
  * Hooks
  * ================================= */
+
+#define TRACEPOINT_HOOK(subsystem, fn_name, invoke_num, args...)           \
+	u32 fn_name##_counter = 0;                                         \
+	SEC("tp/" #subsystem "/" #fn_name)                                 \
+	int fn_name##_hook(args)                                           \
+	{                                                                  \
+		struct task_struct *p =                                    \
+			(struct task_struct *)bpf_get_current_task();      \
+		if (!is_sched_ext(p))                                      \
+			return 0;                                          \
+		__sync_fetch_and_add(&fn_name##_counter, 1);               \
+		dbg("[hook] " #fn_name " called with pid: %d\n",           \
+		    (u32)bpf_get_current_pid_tgid());                      \
+		if (fn_name##_counter == invoke_num) {                     \
+			fn_name##_counter = 0;                             \
+			dbg("[hook] " #fn_name ": bpf schedule called\n"); \
+			bpf_schedule();                                    \
+		}                                                          \
+		return 0;                                                  \
+	}
+
 /*
  * Udelay is called too often to trigger a reschedule every time it is called.
  * Instead, we trigger a reschedule every 300 calls to udelay.
@@ -977,41 +998,7 @@ struct sched_ext_ops serialise_ops = {
 // 	return 0;
 // }
 
-u32 kmalloc_schedule_counter = 0;
-SEC("kprobe/__kmalloc")
-int BPF_KPROBE(kmalloc_probe)
-{
-	struct task_struct *p = (struct task_struct *)bpf_get_current_task();
-	if (!is_sched_ext(p))
-		return 0;
-
-	__sync_fetch_and_add(&kmalloc_schedule_counter, 1);
-	dbg("[kmalloc_probe] pid: %d\n", (u32)bpf_get_current_pid_tgid());
-
-	if (kmalloc_schedule_counter == 5) {
-		kmalloc_schedule_counter = 0;
-		dbg("[kmalloc_probe] bpf schedule called\n");
-		bpf_schedule();
-	}
-
-	return 0;
-}
-
-u32 kfree_schedule_counter = 0;
-SEC("kprobe/kfree")
-int BPF_KPROBE(kfree_probe)
-{
-	struct task_struct *p = (struct task_struct *)bpf_get_current_task();
-	if (!is_sched_ext(p))
-		return 0;
-
-	__sync_fetch_and_add(&kfree_schedule_counter, 1);
-	dbg("[kfree_probe] pid: %d\n", (u32)bpf_get_current_pid_tgid());
-
-	if (kfree_schedule_counter == 8) {
-		kfree_schedule_counter = 0;
-		dbg("[kfree_probe] bpf schedule called\n");
-		bpf_schedule();
-	}
-	return 0;
-}
+TRACEPOINT_HOOK(kmem, kmalloc, 4)
+TRACEPOINT_HOOK(kmem, kfree, 8)
+TRACEPOINT_HOOK(lock, lock_acquire, 300)
+TRACEPOINT_HOOK(lock, lock_release, 400)
