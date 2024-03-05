@@ -45,7 +45,7 @@ static void stat_inc(u32 idx)
 #define MAX_THREADS 50
 
 /* Debugging macros */
-const volatile u32 debug = 1;
+const volatile u32 debug = 0;
 
 #define warn(fmt, args...) bpf_printk(fmt, ##args)
 
@@ -859,6 +859,32 @@ void BPF_STRUCT_OPS(serialise_exit_task, struct task_struct *p,
 	} else if (!is_root_proc) {
 		dbg("[exit_task] VANILLA PROCESS pid: %d, tgid: %d, ppid: %d\n",
 		    p->pid, p->tgid, ppid);
+
+		/* required for syzkaller */
+		if (use_pct) {
+			__sync_fetch_and_add(&iterations, 1);
+
+			/* 
+			 * Update max_num_events if num_events is larger or somewhat smaller 
+			 * 20 is an arbitrary number chosen. Can be changed.
+			 */
+			if (num_events > max_num_events) {
+				max_num_events = num_events;
+			} else if (num_events < max_num_events - 20) {
+				max_num_events = num_events;
+			}
+
+			dbg("[exit_task] iterations: %d, max_num_events: %d\n",
+			    iterations, max_num_events);
+
+			initial_max_num_events = max_num_events;
+			num_events = 0;
+			strata = 0;
+
+			shuffle_prios(&rng_state);
+			choose_change_points(&rng_state);
+		}
+
 	} else {
 		dbg("[exit_task] ROOT PROCESS pid: %d, tgid: %d, ppid: %d\n",
 		    p->pid, p->tgid, ppid);
@@ -966,8 +992,6 @@ struct sched_ext_ops serialise_ops = {
 		if (!is_sched_ext(p))                                      \
 			return 0;                                          \
 		__sync_fetch_and_add(&fn_name##_counter, 1);               \
-		dbg("[hook] " #fn_name " called with pid: %d\n",           \
-		    (u32)bpf_get_current_pid_tgid());                      \
 		if (fn_name##_counter == invoke_num) {                     \
 			fn_name##_counter = 0;                             \
 			dbg("[hook] " #fn_name ": bpf schedule called\n"); \
@@ -998,7 +1022,7 @@ struct sched_ext_ops serialise_ops = {
 // 	return 0;
 // }
 
-TRACEPOINT_HOOK(kmem, kmalloc, 4)
-TRACEPOINT_HOOK(kmem, kfree, 8)
+TRACEPOINT_HOOK(kmem, kmalloc, 5)
+TRACEPOINT_HOOK(kmem, kfree, 10)
 TRACEPOINT_HOOK(lock, lock_acquire, 300)
-TRACEPOINT_HOOK(lock, lock_release, 400)
+TRACEPOINT_HOOK(lock, lock_release, 310)
