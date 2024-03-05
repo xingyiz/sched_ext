@@ -1022,7 +1022,7 @@ struct sched_ext_ops serialise_ops = {
 // 	return 0;
 // }
 
-TRACEPOINT_HOOK(kmem, kmalloc, 5)
-TRACEPOINT_HOOK(kmem, kfree, 10)
-TRACEPOINT_HOOK(lock, lock_acquire, 300)
-TRACEPOINT_HOOK(lock, lock_release, 310)
+TRACEPOINT_HOOK(kmem, kmalloc, 100)
+TRACEPOINT_HOOK(kmem, kfree, 110)
+TRACEPOINT_HOOK(lock, lock_acquire, 1000)
+TRACEPOINT_HOOK(lock, lock_release, 1010)
