@@ -45,7 +45,7 @@ static void stat_inc(u32 idx)
 #define MAX_THREADS 50
 
 /* Debugging macros */
-const volatile u32 debug = 1;
+const volatile u32 debug = 0;
 
 #define warn(fmt, args...) bpf_printk(fmt, ##args)
 
