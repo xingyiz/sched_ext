@@ -45,7 +45,7 @@ static void stat_inc(u32 idx)
 #define MAX_THREADS 50
 
 /* Debugging macros */
-const volatile u32 debug = 0;
+const volatile u32 debug = 1;
 
 #define warn(fmt, args...) bpf_printk(fmt, ##args)
 
@@ -65,7 +65,7 @@ const volatile u32 debug = 0;
  * This flag indicates whether a task has yielded. It is used to signal
  * the dispatch function to dispatch the next highest priority thread.
  */
-bool yield_flag = false;
+// bool yield_flag = false;
 
 /*
  * Task context that is used to store the priority and enqueued status of
@@ -203,6 +203,7 @@ static __u64 get_highest_priority(struct bpf_map *map, pid_t *key,
  */
 #define NSEC_PER_SEC 1000000000L
 #define CLOCK_BOOTTIME 7
+#define SCHED_DELAY_SEC 3
 
 struct heartbeat {
 	struct bpf_timer timer;
@@ -231,7 +232,7 @@ static int heartbeat_timer_fn(void *map, u32 *key, struct bpf_timer *timer)
 	bpf_schedule();
 
 	/* Restart the timer */
-	status = bpf_timer_start(timer, 5 * NSEC_PER_SEC, 0);
+	status = bpf_timer_start(timer, SCHED_DELAY_SEC * NSEC_PER_SEC, 0);
 	if (status) {
 		warn("[heartbeat_timer_fn] failed to start timer\n");
 	}
@@ -256,7 +257,7 @@ static int heartbeat_timer_init(void)
 
 	bpf_timer_init(timer, &heartbeat_timer, CLOCK_BOOTTIME);
 	bpf_timer_set_callback(timer, &heartbeat_timer_fn);
-	status = bpf_timer_start(timer, NSEC_PER_SEC, 0);
+	status = bpf_timer_start(timer, SCHED_DELAY_SEC * NSEC_PER_SEC, 0);
 	if (status) {
 		warn("[heartbeat_timer_init] failed to start timer\n");
 		return status;
@@ -601,9 +602,9 @@ void BPF_STRUCT_OPS(serialise_enqueue, struct task_struct *p, u64 enq_flags)
 			u32 *change_point =
 				bpf_map_lookup_elem(&pct_change_points, &i);
 			if (change_point) {
-				dbg("[enqueue] %d until change \n",
-				    *change_point - (num_events %
-						     initial_max_num_events));
+				// dbg("[enqueue] %d until change \n",
+				//     *change_point - (num_events %
+				// 		     initial_max_num_events));
 				if ((num_events % initial_max_num_events) ==
 				    *change_point) {
 					// If we have observed more events than expected, resume PCT with a
@@ -738,17 +739,19 @@ void BPF_STRUCT_OPS(serialise_dispatch, s32 cpu, struct task_struct *p)
 		    tcallbackctx.num_enqueued, num_threads_alive, task_count);
 
 		dispatch_highest_priority_thread(&tcallbackctx);
-
 	}
 	/* 
 	 * If a previous task has yielded and not yet returned to enqueue(),
-	 * dispatch the next highest priority thread 
+	 * dispatch the next highest priority thread
+	 * 
+	 * Note: This will prevent the same thread from being picked to run
+	 * again; another thread will be dispatched instead.
 	 */
-	else if (yield_flag) {
-		// dbg("[dispatch] yield_flag: %d\n", yield_flag);
-		yield_flag = false;
-		dispatch_highest_priority_thread(&tcallbackctx);
-	}
+	// else if (yield_flag) {
+	// 	// dbg("[dispatch] yield_flag: %d\n", yield_flag);
+	// 	yield_flag = false;
+	// 	dispatch_highest_priority_thread(&tcallbackctx);
+	// }
 
 	// else if (num_threads_alive != 0 && tcallbackctx.num_enqueued != 0) {
 	// dbg("[dispatch] threads_enqueued: %d, threads_alive: %d\n", tcallbackctx.num_enqueued, num_threads_alive);
@@ -765,7 +768,7 @@ bool BPF_STRUCT_OPS(serialise_yield, struct task_struct *from,
 	dbg("[yield] from: %d\n", from->pid);
 
 	/* Tell dispatch that it's ok to dispatch */
-	yield_flag = true;
+	// yield_flag = true;
 
 	/* Set slice to 0 so that dispatch() will be called when its timeslot is up */
 	from->scx.slice = 0;
@@ -982,47 +985,54 @@ struct sched_ext_ops serialise_ops = {
  * Hooks
  * ================================= */
 
-#define TRACEPOINT_HOOK(subsystem, fn_name, invoke_num, args...)           \
-	u32 fn_name##_counter = 0;                                         \
-	SEC("tp/" #subsystem "/" #fn_name)                                 \
-	int fn_name##_hook(args)                                           \
-	{                                                                  \
-		struct task_struct *p =                                    \
-			(struct task_struct *)bpf_get_current_task();      \
-		if (!is_sched_ext(p))                                      \
-			return 0;                                          \
-		__sync_fetch_and_add(&fn_name##_counter, 1);               \
-		if (fn_name##_counter == invoke_num) {                     \
-			fn_name##_counter = 0;                             \
-			dbg("[hook] " #fn_name ": bpf schedule called\n"); \
-			bpf_schedule();                                    \
-		}                                                          \
-		return 0;                                                  \
+#define TRACEPOINT_HOOK(subsystem, fn_name, invoke_num, args...)              \
+	u32 fn_name##_counter = 0;                                            \
+	u32 fn_name##_next_invoke = 10;                                       \
+	SEC("tp/" #subsystem "/" #fn_name)                                    \
+	int fn_name##_hook(args)                                              \
+	{                                                                     \
+		struct task_struct *p =                                       \
+			(struct task_struct *)bpf_get_current_task();         \
+		if (!is_sched_ext(p))                                         \
+			return 0;                                             \
+		__sync_fetch_and_add(&fn_name##_counter, 1);                  \
+		if (fn_name##_counter >= fn_name##_next_invoke) {             \
+			bpf_schedule();                                       \
+			dbg("[hook] " #fn_name ": bpf schedule called: %d\n", \
+			    fn_name##_next_invoke);                           \
+			fn_name##_counter = 0;                                \
+			fn_name##_next_invoke =                               \
+				bpf_get_prandom_u32() % invoke_num + 10;      \
+		}                                                             \
+		return 0;                                                     \
 	}
 
 /*
  * Udelay is called too often to trigger a reschedule every time it is called.
- * Instead, we trigger a reschedule every 300 calls to udelay.
+ * Instead, we trigger a reschedule every few random calls to udelay.
  */
 
-// u32 udelay_schedule_counter = 0;
-// SEC("kprobe/__udelay")
-// int BPF_KPROBE(udelay_probe)
-// {
-// 	struct task_struct *p = (struct task_struct *)bpf_get_current_task();
-// 	if (!is_sched_ext(p))
-// 		return 0;
+u32 udelay_schedule_counter = 0;
+u32 udelay_next_invoke = 10;
+SEC("kprobe/__udelay")
+int BPF_KPROBE(udelay_probe)
+{
+	struct task_struct *p = (struct task_struct *)bpf_get_current_task();
+	if (!is_sched_ext(p))
+		return 0;
 
-// 	__sync_fetch_and_add(&udelay_schedule_counter, 1);
-// 	if (udelay_schedule_counter == 300) {
-// 		udelay_schedule_counter = 0;
-// 		dbg("[udelay_probe] bpf schedule called\n");
-// 		bpf_schedule();
-// 	}
-// 	return 0;
-// }
+	__sync_fetch_and_add(&udelay_schedule_counter, 1);
+	if (udelay_schedule_counter >= udelay_next_invoke) {
+		bpf_schedule();
+		dbg("[udelay_probe] bpf schedule called: %d\n",
+		    udelay_next_invoke);
+		udelay_schedule_counter = 0;
+		udelay_next_invoke = bpf_get_prandom_u32() % 300 + 10;
+	}
+	return 0;
+}
 
-TRACEPOINT_HOOK(kmem, kmalloc, 100)
-TRACEPOINT_HOOK(kmem, kfree, 110)
-TRACEPOINT_HOOK(lock, lock_acquire, 1000)
-TRACEPOINT_HOOK(lock, lock_release, 1010)
+// TRACEPOINT_HOOK(kmem, kmalloc, 30)
+// TRACEPOINT_HOOK(kmem, kfree, 30)
+// TRACEPOINT_HOOK(lock, lock_acquire, 1000)
+// TRACEPOINT_HOOK(lock, lock_release, 1010)
