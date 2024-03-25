@@ -43,9 +43,10 @@ static void stat_inc(u32 idx)
  * how many threads you expect the program-under-test to create.
  */
 #define MAX_THREADS 50
+const volatile u32 use_udelay = 1;
 
 /* Debugging macros */
-const volatile u32 debug = 0;
+const volatile u32 debug = 1;
 
 #define warn(fmt, args...) bpf_printk(fmt, ##args)
 
@@ -1017,6 +1018,9 @@ u32 udelay_next_invoke = 10;
 SEC("kprobe/__udelay")
 int BPF_KPROBE(udelay_probe)
 {
+	if (!use_udelay)
+		return 0;
+
 	struct task_struct *p = (struct task_struct *)bpf_get_current_task();
 	if (!is_sched_ext(p))
 		return 0;
