@@ -12,7 +12,7 @@
 
 char _license[] SEC("license") = "GPL";
 
-struct user_exit_info uei;
+UEI_DEFINE(uei);
 
 s32 BPF_STRUCT_OPS(select_cpu_dispatch_dbl_dsp_select_cpu, struct task_struct *p,
 		   s32 prev_cpu, u64 wake_flags)
@@ -24,22 +24,14 @@ s32 BPF_STRUCT_OPS(select_cpu_dispatch_dbl_dsp_select_cpu, struct task_struct *p
 	return prev_cpu;
 }
 
-s32 BPF_STRUCT_OPS(select_cpu_dispatch_dbl_dsp_init)
-{
-	scx_bpf_switch_all();
-
-	return 0;
-}
-
 void BPF_STRUCT_OPS(select_cpu_dispatch_dbl_dsp_exit, struct scx_exit_info *ei)
 {
-	uei_record(&uei, ei);
+	UEI_RECORD(uei, ei);
 }
 
 SEC(".struct_ops.link")
 struct sched_ext_ops select_cpu_dispatch_dbl_dsp_ops = {
 	.select_cpu		= select_cpu_dispatch_dbl_dsp_select_cpu,
-	.init			= select_cpu_dispatch_dbl_dsp_init,
 	.exit			= select_cpu_dispatch_dbl_dsp_exit,
 	.name			= "select_cpu_dispatch_dbl_dsp",
 	.timeout_ms		= 1000U,

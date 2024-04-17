@@ -19,7 +19,8 @@ const char help_fmt[] =
 "\n"
 "See the top-level comment in .bpf.c for more details.\n"
 "\n"
-"Usage: %s [-s SLICE_US] [-e COUNT] [-t COUNT] [-T COUNT] [-l COUNT] [-d PID] [-p]\n"
+"Usage: %s [-s SLICE_US] [-e COUNT] [-t COUNT] [-T COUNT] [-l COUNT] [-d PID]\n"
+"       [-D LEN] [-p]\n"
 "\n"
 "  -s SLICE_US   Override slice duration\n"
 "  -e COUNT      Trigger scx_bpf_error() after COUNT enqueues\n"
@@ -27,6 +28,7 @@ const char help_fmt[] =
 "  -T COUNT      Stall every COUNT'th kernel thread\n"
 "  -l COUNT      Trigger dispatch infinite looping after COUNT dispatches\n"
 "  -d PID        Disallow a process from switching into SCHED_EXT (-1 for self)\n"
+"  -D LEN        Set scx_exit_info.dump buffer length\n"
 "  -p            Switch only tasks on SCHED_EXT policy intead of all\n"
 "  -h            Display this help and exit\n";
 
@@ -51,7 +53,7 @@ int main(int argc, char **argv)
 	skel = scx_qmap__open();
 	SCX_BUG_ON(!skel, "Failed to open skel");
 
-	while ((opt = getopt(argc, argv, "s:e:t:T:l:d:ph")) != -1) {
+	while ((opt = getopt(argc, argv, "s:e:t:T:l:d:D:ph")) != -1) {
 		switch (opt) {
 		case 's':
 			skel->rodata->slice_ns = strtoull(optarg, NULL, 0) * 1000;
@@ -73,8 +75,12 @@ int main(int argc, char **argv)
 			if (skel->rodata->disallow_tgid < 0)
 				skel->rodata->disallow_tgid = getpid();
 			break;
+		case 'D':
+			skel->struct_ops.qmap_ops->exit_dump_len = strtoul(optarg, NULL, 0);
+			break;
 		case 'p':
 			skel->rodata->switch_partial = true;
+			skel->struct_ops.qmap_ops->flags |= __COMPAT_SCX_OPS_SWITCH_PARTIAL;
 			break;
 		default:
 			fprintf(stderr, help_fmt, basename(argv[0]));
@@ -82,25 +88,30 @@ int main(int argc, char **argv)
 		}
 	}
 
-	SCX_BUG_ON(scx_qmap__load(skel), "Failed to load skel");
+	SCX_OPS_LOAD(skel, qmap_ops, scx_qmap, uei);
+	link = SCX_OPS_ATTACH(skel, qmap_ops);
 
-	link = bpf_map__attach_struct_ops(skel->maps.qmap_ops);
-	SCX_BUG_ON(!link, "Failed to attach struct_ops");
-
-	while (!exit_req && !uei_exited(&skel->bss->uei)) {
+	while (!exit_req && !UEI_EXITED(skel, uei)) {
 		long nr_enqueued = skel->bss->nr_enqueued;
 		long nr_dispatched = skel->bss->nr_dispatched;
 
-		printf("enq=%lu, dsp=%lu, delta=%ld, reenq=%" PRIu64 ", deq=%" PRIu64 ", core=%" PRIu64 "\n",
+		printf("stats  : enq=%lu dsp=%lu delta=%ld reenq=%" PRIu64 " deq=%" PRIu64 " core=%" PRIu64 "\n",
 		       nr_enqueued, nr_dispatched, nr_enqueued - nr_dispatched,
 		       skel->bss->nr_reenqueued, skel->bss->nr_dequeued,
 		       skel->bss->nr_core_sched_execed);
+		printf("cpuperf: cur min/avg/max=%u/%u/%u target min/avg/max=%u/%u/%u\n",
+		       skel->bss->cpuperf_min,
+		       skel->bss->cpuperf_avg,
+		       skel->bss->cpuperf_max,
+		       skel->bss->cpuperf_target_min,
+		       skel->bss->cpuperf_target_avg,
+		       skel->bss->cpuperf_target_max);
 		fflush(stdout);
 		sleep(1);
 	}
 
 	bpf_link__destroy(link);
-	uei_print(&skel->bss->uei);
+	UEI_REPORT(skel, uei);
 	scx_qmap__destroy(skel);
 	return 0;
 }

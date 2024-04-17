@@ -372,7 +372,7 @@ void rtw89_core_set_chip_txpwr(struct rtw89_dev *rtwdev)
 	chip->ops->set_txpwr(rtwdev, chan, phy_idx);
 }
 
-void rtw89_set_channel(struct rtw89_dev *rtwdev)
+int rtw89_set_channel(struct rtw89_dev *rtwdev)
 {
 	struct rtw89_hal *hal = &rtwdev->hal;
 	const struct rtw89_chip_info *chip = rtwdev->chip;
@@ -399,7 +399,7 @@ void rtw89_set_channel(struct rtw89_dev *rtwdev)
 		break;
 	default:
 		WARN(1, "Invalid ent mode: %d\n", mode);
-		return;
+		return -EINVAL;
 	}
 
 	roc_idx = atomic_read(&hal->roc_entity_idx);
@@ -426,6 +426,7 @@ void rtw89_set_channel(struct rtw89_dev *rtwdev)
 	}
 
 	rtw89_set_entity_state(rtwdev, true);
+	return 0;
 }
 
 void rtw89_get_channel(struct rtw89_dev *rtwdev, struct rtw89_vif *rtwvif,
@@ -1868,6 +1869,17 @@ static void rtw89_core_cancel_6ghz_probe_tx(struct rtw89_dev *rtwdev,
 		ieee80211_queue_work(rtwdev->hw, &rtwdev->cancel_6ghz_probe_work);
 }
 
+static void rtw89_vif_sync_bcn_tsf(struct rtw89_vif *rtwvif,
+				   struct ieee80211_hdr *hdr, size_t len)
+{
+	struct ieee80211_mgmt *mgmt = (typeof(mgmt))hdr;
+
+	if (len < offsetof(typeof(*mgmt), u.beacon.variable))
+		return;
+
+	WRITE_ONCE(rtwvif->sync_bcn_tsf, le64_to_cpu(mgmt->u.beacon.timestamp));
+}
+
 static void rtw89_vif_rx_stats_iter(void *data, u8 *mac,
 				    struct ieee80211_vif *vif)
 {
@@ -1898,8 +1910,10 @@ static void rtw89_vif_rx_stats_iter(void *data, u8 *mac,
 		return;
 
 	if (ieee80211_is_beacon(hdr->frame_control)) {
-		if (vif->type == NL80211_IFTYPE_STATION)
+		if (vif->type == NL80211_IFTYPE_STATION) {
+			rtw89_vif_sync_bcn_tsf(rtwvif, hdr, skb->len);
 			rtw89_fw_h2c_rssi_offload(rtwdev, phy_ppdu);
+		}
 		pkt_stat->beacon_nr++;
 	}
 
@@ -3787,7 +3801,7 @@ static void rtw89_init_eht_cap(struct rtw89_dev *rtwdev,
 	struct ieee80211_sta_eht_cap *eht_cap;
 	struct rtw89_hal *hal = &rtwdev->hal;
 	bool support_320mhz = false;
-	int sts = 3;
+	int sts = 8;
 	u8 val;
 
 	if (chip->chip_gen == RTW89_CHIP_AX)
@@ -3831,18 +3845,16 @@ static void rtw89_init_eht_cap(struct rtw89_dev *rtwdev,
 	eht_cap_elem->phy_cap_info[2] = 0;
 
 	eht_cap_elem->phy_cap_info[3] =
-		IEEE80211_EHT_PHY_CAP3_NG_16_SU_FEEDBACK |
-		IEEE80211_EHT_PHY_CAP3_NG_16_MU_FEEDBACK |
 		IEEE80211_EHT_PHY_CAP3_CODEBOOK_4_2_SU_FDBK |
 		IEEE80211_EHT_PHY_CAP3_CODEBOOK_7_5_MU_FDBK |
-		IEEE80211_EHT_PHY_CAP3_TRIG_CQI_FDBK;
+		IEEE80211_EHT_PHY_CAP3_TRIG_SU_BF_FDBK |
+		IEEE80211_EHT_PHY_CAP3_TRIG_MU_BF_PART_BW_FDBK;
 
 	eht_cap_elem->phy_cap_info[4] =
 		IEEE80211_EHT_PHY_CAP4_POWER_BOOST_FACT_SUPP |
 		u8_encode_bits(1, IEEE80211_EHT_PHY_CAP4_MAX_NC_MASK);
 
 	eht_cap_elem->phy_cap_info[5] =
-		IEEE80211_EHT_PHY_CAP5_NON_TRIG_CQI_FEEDBACK |
 		u8_encode_bits(IEEE80211_EHT_PHY_CAP5_COMMON_NOMINAL_PKT_PAD_20US,
 			       IEEE80211_EHT_PHY_CAP5_COMMON_NOMINAL_PKT_PAD_MASK);
 
@@ -4061,7 +4073,6 @@ int rtw89_core_start(struct rtw89_dev *rtwdev)
 {
 	int ret;
 
-	rtwdev->mac.qta_mode = RTW89_QTA_SCC;
 	ret = rtw89_mac_init(rtwdev);
 	if (ret) {
 		rtw89_err(rtwdev, "mac init fail, ret:%d\n", ret);
@@ -4101,6 +4112,7 @@ int rtw89_core_start(struct rtw89_dev *rtwdev)
 
 	set_bit(RTW89_FLAG_RUNNING, rtwdev->flags);
 
+	rtw89_chip_rfk_init_late(rtwdev);
 	rtw89_btc_ntfy_radio_state(rtwdev, BTC_RFCTRL_WL_ON);
 	rtw89_fw_h2c_fw_log(rtwdev, rtwdev->fw.log.enable);
 	rtw89_fw_h2c_init_ba_cam(rtwdev);
@@ -4198,6 +4210,13 @@ int rtw89_core_init(struct rtw89_dev *rtwdev)
 	rtwdev->hal.rx_fltr = DEFAULT_AX_RX_FLTR;
 	rtwdev->dbcc_en = false;
 	rtwdev->mlo_dbcc_mode = MLO_DBCC_NOT_SUPPORT;
+	rtwdev->mac.qta_mode = RTW89_QTA_SCC;
+
+	if (rtwdev->chip->chip_gen == RTW89_CHIP_BE) {
+		rtwdev->dbcc_en = true;
+		rtwdev->mac.qta_mode = RTW89_QTA_DBCC;
+		rtwdev->mlo_dbcc_mode = MLO_2_PLUS_0_1RF;
+	}
 
 	INIT_WORK(&btc->eapol_notify_work, rtw89_btc_ntfy_eapol_packet_work);
 	INIT_WORK(&btc->arp_notify_work, rtw89_btc_ntfy_arp_packet_work);
@@ -4205,6 +4224,7 @@ int rtw89_core_init(struct rtw89_dev *rtwdev)
 	INIT_WORK(&btc->icmp_notify_work, rtw89_btc_ntfy_icmp_packet_work);
 
 	init_completion(&rtwdev->fw.req.completion);
+	init_completion(&rtwdev->rfk_wait.completion);
 
 	schedule_work(&rtwdev->load_firmware_work);
 
@@ -4445,9 +4465,6 @@ static int rtw89_core_register_hw(struct rtw89_dev *rtwdev)
 	ieee80211_hw_set(hw, SUPPORTS_MULTI_BSSID);
 	ieee80211_hw_set(hw, WANT_MONITOR_VIF);
 
-	/* ref: description of rtw89_mcc_get_tbtt_ofst() in chan.c */
-	ieee80211_hw_set(hw, TIMING_BEACON_ONLY);
-
 	if (chip->support_bandwidths & BIT(NL80211_CHAN_WIDTH_160))
 		ieee80211_hw_set(hw, SUPPORTS_VHT_EXT_NSS_BW);
 
@@ -4486,6 +4503,8 @@ static int rtw89_core_register_hw(struct rtw89_dev *rtwdev)
 	hw->wiphy->max_remain_on_channel_duration = 1000;
 
 	wiphy_ext_feature_set(hw->wiphy, NL80211_EXT_FEATURE_CAN_REPLACE_PTK0);
+	wiphy_ext_feature_set(hw->wiphy, NL80211_EXT_FEATURE_SCAN_RANDOM_SN);
+	wiphy_ext_feature_set(hw->wiphy, NL80211_EXT_FEATURE_SET_SCAN_DWELL);
 
 	ret = rtw89_core_set_supported_band(rtwdev);
 	if (ret) {
@@ -4577,9 +4596,10 @@ struct rtw89_dev *rtw89_alloc_ieee80211_hw(struct device *device,
 		     !RTW89_CHK_FW_FEATURE(BEACON_FILTER, &early_fw);
 
 	if (no_chanctx) {
-		ops->add_chanctx = NULL;
-		ops->remove_chanctx = NULL;
-		ops->change_chanctx = NULL;
+		ops->add_chanctx = ieee80211_emulate_add_chanctx;
+		ops->remove_chanctx = ieee80211_emulate_remove_chanctx;
+		ops->change_chanctx = ieee80211_emulate_change_chanctx;
+		ops->switch_vif_chanctx = ieee80211_emulate_switch_vif_chanctx;
 		ops->assign_vif_chanctx = NULL;
 		ops->unassign_vif_chanctx = NULL;
 		ops->remain_on_channel = NULL;

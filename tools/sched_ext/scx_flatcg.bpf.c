@@ -56,10 +56,9 @@ char _license[] SEC("license") = "GPL";
 const volatile u32 nr_cpus = 32;	/* !0 for veristat, set during init */
 const volatile u64 cgrp_slice_ns = SCX_SLICE_DFL;
 const volatile bool fifo_sched;
-const volatile bool switch_partial;
 
 u64 cvtime_now;
-struct user_exit_info uei;
+UEI_DEFINE(uei);
 
 struct {
 	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
@@ -100,6 +99,7 @@ struct cgv_node {
 	struct bpf_rb_node	rb_node;
 	__u64			cvtime;
 	__u64			cgid;
+	struct bpf_refcount	refcount;
 };
 
 private(CGV_TREE) struct bpf_spin_lock cgv_tree_lock;
@@ -289,14 +289,17 @@ static void cgrp_enqueued(struct cgroup *cgrp, struct fcg_cgrp_ctx *cgc)
 	}
 
 	stash = bpf_map_lookup_elem(&cgv_node_stash, &cgid);
-	if (!stash) {
+	if (!stash || !stash->node) {
 		scx_bpf_error("cgv_node lookup failed for cgid %llu", cgid);
 		return;
 	}
 
-	/* NULL if the node is already on the rbtree */
-	cgv_node = bpf_kptr_xchg(&stash->node, NULL);
+	cgv_node = bpf_refcount_acquire(stash->node);
 	if (!cgv_node) {
+		/*
+		 * Node never leaves cgv_node_stash, this should only happen if
+		 * fcg_cgroup_exit deletes the stashed node
+		 */
 		stat_inc(FCG_STAT_ENQ_RACE);
 		return;
 	}
@@ -609,7 +612,6 @@ void BPF_STRUCT_OPS(fcg_cgroup_set_weight, struct cgroup *cgrp, u32 weight)
 static bool try_pick_next_cgroup(u64 *cgidp)
 {
 	struct bpf_rb_node *rb_node;
-	struct cgv_node_stash *stash;
 	struct cgv_node *cgv_node;
 	struct fcg_cgrp_ctx *cgc;
 	struct cgroup *cgrp;
@@ -693,12 +695,6 @@ static bool try_pick_next_cgroup(u64 *cgidp)
 	return true;
 
 out_stash:
-	stash = bpf_map_lookup_elem(&cgv_node_stash, &cgid);
-	if (!stash) {
-		stat_inc(FCG_STAT_PNC_GONE);
-		goto out_free;
-	}
-
 	/*
 	 * Paired with cmpxchg in cgrp_enqueued(). If they see the following
 	 * transition, they'll enqueue the cgroup. If they are earlier, we'll
@@ -711,15 +707,8 @@ out_stash:
 		bpf_rbtree_add(&cgv_tree, &cgv_node->rb_node, cgv_node_less);
 		bpf_spin_unlock(&cgv_tree_lock);
 		stat_inc(FCG_STAT_PNC_RACE);
-	} else {
-		cgv_node = bpf_kptr_xchg(&stash->node, cgv_node);
-		if (cgv_node) {
-			scx_bpf_error("unexpected !NULL cgv_node stash");
-			goto out_free;
-		}
+		return false;
 	}
-
-	return false;
 
 out_free:
 	bpf_obj_drop(cgv_node);
@@ -927,34 +916,24 @@ void BPF_STRUCT_OPS(fcg_cgroup_move, struct task_struct *p,
 	p->scx.dsq_vtime = to_cgc->tvtime_now + vtime_delta;
 }
 
-s32 BPF_STRUCT_OPS(fcg_init)
-{
-	if (!switch_partial)
-		scx_bpf_switch_all();
-	return 0;
-}
-
 void BPF_STRUCT_OPS(fcg_exit, struct scx_exit_info *ei)
 {
-	uei_record(&uei, ei);
+	UEI_RECORD(uei, ei);
 }
 
-SEC(".struct_ops.link")
-struct sched_ext_ops flatcg_ops = {
-	.select_cpu		= (void *)fcg_select_cpu,
-	.enqueue		= (void *)fcg_enqueue,
-	.dispatch		= (void *)fcg_dispatch,
-	.runnable		= (void *)fcg_runnable,
-	.running		= (void *)fcg_running,
-	.stopping		= (void *)fcg_stopping,
-	.quiescent		= (void *)fcg_quiescent,
-	.init_task		= (void *)fcg_init_task,
-	.cgroup_set_weight	= (void *)fcg_cgroup_set_weight,
-	.cgroup_init		= (void *)fcg_cgroup_init,
-	.cgroup_exit		= (void *)fcg_cgroup_exit,
-	.cgroup_move		= (void *)fcg_cgroup_move,
-	.init			= (void *)fcg_init,
-	.exit			= (void *)fcg_exit,
-	.flags			= SCX_OPS_CGROUP_KNOB_WEIGHT | SCX_OPS_ENQ_EXITING,
-	.name			= "flatcg",
-};
+SCX_OPS_DEFINE(flatcg_ops,
+	       .select_cpu		= (void *)fcg_select_cpu,
+	       .enqueue			= (void *)fcg_enqueue,
+	       .dispatch		= (void *)fcg_dispatch,
+	       .runnable		= (void *)fcg_runnable,
+	       .running			= (void *)fcg_running,
+	       .stopping		= (void *)fcg_stopping,
+	       .quiescent		= (void *)fcg_quiescent,
+	       .init_task		= (void *)fcg_init_task,
+	       .cgroup_set_weight	= (void *)fcg_cgroup_set_weight,
+	       .cgroup_init		= (void *)fcg_cgroup_init,
+	       .cgroup_exit		= (void *)fcg_cgroup_exit,
+	       .cgroup_move		= (void *)fcg_cgroup_move,
+	       .exit			= (void *)fcg_exit,
+	       .flags			= SCX_OPS_CGROUP_KNOB_WEIGHT | SCX_OPS_ENQ_EXITING,
+	       .name			= "flatcg");

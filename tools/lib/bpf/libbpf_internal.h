@@ -374,6 +374,8 @@ enum kern_feature_id {
 	FEAT_UPROBE_MULTI_LINK,
 	/* Kernel supports arg:ctx tag (__arg_ctx) for global subprogs natively */
 	FEAT_ARG_CTX_TAG,
+	/* Kernel supports '?' at the front of datasec names */
+	FEAT_BTF_QMARK_DATASEC,
 	__FEAT_CNT,
 };
 
@@ -515,11 +517,6 @@ int btf_ext_visit_type_ids(struct btf_ext *btf_ext, type_id_visit_fn visit, void
 int btf_ext_visit_str_offs(struct btf_ext *btf_ext, str_off_visit_fn visit, void *ctx);
 __s32 btf__find_by_name_kind_own(const struct btf *btf, const char *type_name,
 				 __u32 kind);
-
-typedef int (*kallsyms_cb_t)(unsigned long long sym_addr, char sym_type,
-			     const char *sym_name, void *ctx);
-
-int libbpf_kallsyms_parse(kallsyms_cb_t cb, void *arg);
 
 /* handle direct returned errors */
 static inline int libbpf_err(int ret)
