@@ -92,9 +92,6 @@ void *bpf_internal_load_pointer_neg_helper(const struct sk_buff *skb, int k,
 /* tell bpf programs that include vmlinux.h kernel's PAGE_SIZE */
 enum page_size_enum { __PAGE_SIZE = PAGE_SIZE };
 
-/* tell bpf programs that include vmlinux.h kernel's PAGE_SIZE */
-enum page_size_enum { __PAGE_SIZE = PAGE_SIZE };
-
 struct bpf_prog *bpf_prog_alloc_no_stats(unsigned int size,
 					 gfp_t gfp_extra_flags)
 {
@@ -2943,17 +2940,6 @@ void __weak arch_bpf_stack_walk(bool (*consume_fn)(void *cookie, u64 ip, u64 sp,
 						   u64 bp),
 				void *cookie)
 {
-}
-
-/* for configs without MMU or 32-bit */
-__weak const struct bpf_map_ops arena_map_ops;
-__weak u64 bpf_arena_get_user_vm_start(struct bpf_arena *arena)
-{
-	return 0;
-}
-__weak u64 bpf_arena_get_kern_vm_start(struct bpf_arena *arena)
-{
-	return 0;
 }
 
 /* for configs without MMU or 32-bit */

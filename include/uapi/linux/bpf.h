@@ -16,8 +16,14 @@
 /* instruction classes */
 #define BPF_JMP32 0x06 /* jmp mode in word width */
 #define BPF_ALU64 0x07 /* alu mode in double word width */
+#define BPF_JMP32 0x06 /* jmp mode in word width */
+#define BPF_ALU64 0x07 /* alu mode in double word width */
 
 /* ld/ldx fields */
+#define BPF_DW 0x18 /* double word (64-bit) */
+#define BPF_MEMSX 0x80 /* load with sign extension */
+#define BPF_ATOMIC 0xc0 /* atomic memory ops - op type in immediate */
+#define BPF_XADD 0xc0 /* exclusive add - legacy name */
 #define BPF_DW 0x18 /* double word (64-bit) */
 #define BPF_MEMSX 0x80 /* load with sign extension */
 #define BPF_ATOMIC 0xc0 /* atomic memory ops - op type in immediate */
@@ -26,8 +32,15 @@
 /* alu/jmp fields */
 #define BPF_MOV 0xb0 /* mov reg to reg */
 #define BPF_ARSH 0xc0 /* sign extending arithmetic shift right */
+#define BPF_MOV 0xb0 /* mov reg to reg */
+#define BPF_ARSH 0xc0 /* sign extending arithmetic shift right */
 
 /* change endianness of a register */
+#define BPF_END 0xd0 /* flags for endianness conversion: */
+#define BPF_TO_LE 0x00 /* convert to little-endian */
+#define BPF_TO_BE 0x08 /* convert to big-endian */
+#define BPF_FROM_LE BPF_TO_LE
+#define BPF_FROM_BE BPF_TO_BE
 #define BPF_END 0xd0 /* flags for endianness conversion: */
 #define BPF_TO_LE 0x00 /* convert to little-endian */
 #define BPF_TO_BE 0x08 /* convert to big-endian */
@@ -89,20 +102,6 @@ struct bpf_insn {
 struct bpf_lpm_trie_key {
 	__u32 prefixlen; /* up to 32 for AF_INET, 128 for AF_INET6 */
 	__u8 data[0]; /* Arbitrary size */
-};
-
-/* Header for bpf_lpm_trie_key structs */
-struct bpf_lpm_trie_key_hdr {
-	__u32 prefixlen;
-};
-
-/* Key of an a BPF_MAP_TYPE_LPM_TRIE entry, with trailing byte array. */
-struct bpf_lpm_trie_key_u8 {
-	union {
-		struct bpf_lpm_trie_key_hdr hdr;
-		__u32 prefixlen;
-	};
-	__u8 data[]; /* Arbitrary size */
 };
 
 /* Header for bpf_lpm_trie_key structs */

@@ -12,7 +12,7 @@
 
 char _license[] SEC("license") = "GPL";
 
-struct user_exit_info uei;
+UEI_DEFINE(uei);
 
 /*
  * Dispatch statistics. This map is used to keep track of the number of times
@@ -957,7 +957,7 @@ s32 BPF_STRUCT_OPS_SLEEPABLE(serialise_init)
  */
 void BPF_STRUCT_OPS(serialise_exit, struct scx_exit_info *ei)
 {
-	uei_record(&uei, ei);
+	UEI_RECORD(uei, ei);
 }
 
 /*
@@ -977,7 +977,7 @@ struct sched_ext_ops serialise_ops = {
 	.exit_task = (void *)serialise_exit_task,
 	.init = (void *)serialise_init,
 	.exit = (void *)serialise_exit,
-	.flags = SCX_OPS_ENQ_LAST,
+	.flags = SCX_OPS_ENQ_LAST | SCX_OPS_SWITCH_PARTIAL,
 	.timeout_ms = 30000,
 	.name = "serialise",
 };

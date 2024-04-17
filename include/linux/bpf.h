@@ -140,8 +140,10 @@ struct bpf_map_ops {
 	int (*map_mmap)(struct bpf_map *map, struct vm_area_struct *vma);
 	__poll_t (*map_poll)(struct bpf_map *map, struct file *filp,
 			     struct poll_table_struct *pts);
-	unsigned long (*map_get_unmapped_area)(struct file *filep, unsigned long addr,
-					       unsigned long len, unsigned long pgoff,
+	unsigned long (*map_get_unmapped_area)(struct file *filep,
+					       unsigned long addr,
+					       unsigned long len,
+					       unsigned long pgoff,
 					       unsigned long flags);
 
 	/* Functions called by bpf_local_storage maps */
@@ -712,7 +714,7 @@ enum bpf_arg_type {
 	/* Used to prototype bpf_memcmp() and other functions that access data
 	 * on eBPF program stack
 	 */
-	ARG_PTR_TO_MEM,		/* pointer to valid memory (stack, packet, map value) */
+	ARG_PTR_TO_MEM, /* pointer to valid memory (stack, packet, map value) */
 	ARG_PTR_TO_ARENA,
 
 	ARG_CONST_SIZE, /* number of bytes accessed from memory */
@@ -883,11 +885,11 @@ enum bpf_reg_type {
 	 * been checked for null. Used primarily to inform the verifier
 	 * an explicit null check is required for this struct.
 	 */
-	PTR_TO_MEM,		 /* reg points to valid memory region */
+	PTR_TO_MEM, /* reg points to valid memory region */
 	PTR_TO_ARENA,
-	PTR_TO_BUF,		 /* reg points to a read/write buffer */
-	PTR_TO_FUNC,		 /* reg points to a bpf program function */
-	CONST_PTR_TO_DYNPTR,	 /* reg points to a const struct bpf_dynptr */
+	PTR_TO_BUF, /* reg points to a read/write buffer */
+	PTR_TO_FUNC, /* reg points to a bpf program function */
+	CONST_PTR_TO_DYNPTR, /* reg points to a const struct bpf_dynptr */
 	__BPF_REG_TYPE_MAX,
 
 	/* Extended reg_types. */
@@ -1531,27 +1533,27 @@ struct bpf_prog_aux {
 };
 
 struct bpf_prog {
-	u16			pages;		/* Number of allocated pages */
-	u16			jited:1,	/* Is our filter JIT'ed? */
-				jit_requested:1,/* archs need to JIT the prog */
-				gpl_compatible:1, /* Is filter GPL compatible? */
-				cb_access:1,	/* Is control block accessed? */
-				dst_needed:1,	/* Do we need dst entry? */
-				blinding_requested:1, /* needs constant blinding */
-				blinded:1,	/* Was blinded */
-				is_func:1,	/* program is a bpf function */
-				kprobe_override:1, /* Do we override a kprobe? */
-				has_callchain_buf:1, /* callchain buffer allocated? */
-				enforce_expected_attach_type:1, /* Enforce expected_attach_type checking at attach time */
-				call_get_stack:1, /* Do we call bpf_get_stack() or bpf_get_stackid() */
-				call_get_func_ip:1, /* Do we call get_func_ip() */
-				tstamp_type_access:1, /* Accessed __sk_buff->tstamp_type */
-				sleepable:1;	/* BPF program is sleepable */
-	enum bpf_prog_type	type;		/* Type of BPF program */
-	enum bpf_attach_type	expected_attach_type; /* For some prog types */
-	u32			len;		/* Number of filter blocks */
-	u32			jited_len;	/* Size of jited insns in bytes */
-	u8			tag[BPF_TAG_SIZE];
+	u16 pages; /* Number of allocated pages */
+	u16 jited : 1, /* Is our filter JIT'ed? */
+		jit_requested : 1, /* archs need to JIT the prog */
+		gpl_compatible : 1, /* Is filter GPL compatible? */
+		cb_access : 1, /* Is control block accessed? */
+		dst_needed : 1, /* Do we need dst entry? */
+		blinding_requested : 1, /* needs constant blinding */
+		blinded : 1, /* Was blinded */
+		is_func : 1, /* program is a bpf function */
+		kprobe_override : 1, /* Do we override a kprobe? */
+		has_callchain_buf : 1, /* callchain buffer allocated? */
+		enforce_expected_attach_type : 1, /* Enforce expected_attach_type checking at attach time */
+		call_get_stack : 1, /* Do we call bpf_get_stack() or bpf_get_stackid() */
+		call_get_func_ip : 1, /* Do we call get_func_ip() */
+		tstamp_type_access : 1, /* Accessed __sk_buff->tstamp_type */
+		sleepable : 1; /* BPF program is sleepable */
+	enum bpf_prog_type type; /* Type of BPF program */
+	enum bpf_attach_type expected_attach_type; /* For some prog types */
+	u32 len; /* Number of filter blocks */
+	u32 jited_len; /* Size of jited insns in bytes */
+	u8 tag[BPF_TAG_SIZE];
 	struct bpf_prog_stats __percpu *stats;
 	int __percpu *active;
 	unsigned int (*bpf_func)(const void *ctx, const struct bpf_insn *insn);
@@ -1779,9 +1781,8 @@ int bpf_struct_ops_map_sys_lookup_elem(struct bpf_map *map, void *key,
 int bpf_struct_ops_prepare_trampoline(struct bpf_tramp_links *tlinks,
 				      struct bpf_tramp_link *link,
 				      const struct btf_func_model *model,
-				      void *stub_func,
-				      void **image, u32 *image_off,
-				      bool allow_alloc);
+				      void *stub_func, void **image,
+				      u32 *image_off, bool allow_alloc);
 void bpf_struct_ops_image_free(void *image);
 static inline bool bpf_try_module_get(const void *data, struct module *owner)
 {

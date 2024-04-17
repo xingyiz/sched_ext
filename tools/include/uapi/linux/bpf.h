@@ -35,7 +35,6 @@
 #define BPF_FROM_BE BPF_TO_BE
 
 /* jmp encodings */
-<<<<<<< HEAD
 #define BPF_JNE 0x50 /* jump != */
 #define BPF_JLT 0xa0 /* LT is unsigned, '<' */
 #define BPF_JLE 0xb0 /* LE is unsigned, '<=' */
@@ -43,20 +42,9 @@
 #define BPF_JSGE 0x70 /* SGE is signed '>=', GE in x86 */
 #define BPF_JSLT 0xc0 /* SLT is signed, '<' */
 #define BPF_JSLE 0xd0 /* SLE is signed, '<=' */
+#define BPF_JCOND 0xe0 /* conditional pseudo jumps: may_goto, goto_or_nop */
 #define BPF_CALL 0x80 /* function call */
 #define BPF_EXIT 0x90 /* function return */
-=======
-#define BPF_JNE		0x50	/* jump != */
-#define BPF_JLT		0xa0	/* LT is unsigned, '<' */
-#define BPF_JLE		0xb0	/* LE is unsigned, '<=' */
-#define BPF_JSGT	0x60	/* SGT is signed '>', GT in x86 */
-#define BPF_JSGE	0x70	/* SGE is signed '>=', GE in x86 */
-#define BPF_JSLT	0xc0	/* SLT is signed, '<' */
-#define BPF_JSLE	0xd0	/* SLE is signed, '<=' */
-#define BPF_JCOND	0xe0	/* conditional pseudo jumps: may_goto, goto_or_nop */
-#define BPF_CALL	0x80	/* function call */
-#define BPF_EXIT	0x90	/* function return */
->>>>>>> upstream/sched_ext
 
 /* atomic op type fields (stored in immediate) */
 #define BPF_FETCH 0x01 /* not an opcode on its own, used to build others */
@@ -105,16 +93,16 @@ struct bpf_lpm_trie_key {
 
 /* Header for bpf_lpm_trie_key structs */
 struct bpf_lpm_trie_key_hdr {
-	__u32	prefixlen;
+	__u32 prefixlen;
 };
 
 /* Key of an a BPF_MAP_TYPE_LPM_TRIE entry, with trailing byte array. */
 struct bpf_lpm_trie_key_u8 {
 	union {
-		struct bpf_lpm_trie_key_hdr	hdr;
-		__u32				prefixlen;
+		struct bpf_lpm_trie_key_hdr hdr;
+		__u32 prefixlen;
 	};
-	__u8	data[];		/* Arbitrary size */
+	__u8 data[]; /* Arbitrary size */
 };
 
 struct bpf_cgroup_storage_key {
@@ -1408,19 +1396,14 @@ enum {
 	/* Flag for value_type_btf_obj_fd, the fd is available */
 	BPF_F_VTYPE_BTF_OBJ_FD = (1U << 15),
 
-<<<<<<< HEAD
 	/* BPF token FD is passed in a corresponding command's token_fd field */
 	BPF_F_TOKEN_FD = (1U << 16),
-=======
-/* BPF token FD is passed in a corresponding command's token_fd field */
-	BPF_F_TOKEN_FD          = (1U << 16),
 
-/* When user space page faults in bpf_arena send SIGSEGV instead of inserting new page */
-	BPF_F_SEGV_ON_FAULT	= (1U << 17),
+	/* When user space page faults in bpf_arena send SIGSEGV instead of inserting new page */
+	BPF_F_SEGV_ON_FAULT = (1U << 17),
 
-/* Do not translate kernel bpf_arena pointers to user pointers */
-	BPF_F_NO_USER_CONV	= (1U << 18),
->>>>>>> upstream/sched_ext
+	/* Do not translate kernel bpf_arena pointers to user pointers */
+	BPF_F_NO_USER_CONV = (1U << 18),
 };
 
 /* Flags for BPF_PROG_QUERY. */
@@ -1676,10 +1659,10 @@ union bpf_attr {
 	} query;
 
 	struct { /* anonymous struct used by BPF_RAW_TRACEPOINT_OPEN command */
-		__u64		name;
-		__u32		prog_fd;
-		__u32		:32;
-		__aligned_u64	cookie;
+		__u64 name;
+		__u32 prog_fd;
+		__u32 : 32;
+		__aligned_u64 cookie;
 	} raw_tracepoint;
 
 	struct { /* anonymous struct for BPF_BTF_LOAD */
@@ -7144,14 +7127,9 @@ enum {
 	BPF_FIB_LOOKUP_DIRECT = (1U << 0),
 	BPF_FIB_LOOKUP_OUTPUT = (1U << 1),
 	BPF_FIB_LOOKUP_SKIP_NEIGH = (1U << 2),
-<<<<<<< HEAD
 	BPF_FIB_LOOKUP_TBID = (1U << 3),
 	BPF_FIB_LOOKUP_SRC = (1U << 4),
-=======
-	BPF_FIB_LOOKUP_TBID    = (1U << 3),
-	BPF_FIB_LOOKUP_SRC     = (1U << 4),
-	BPF_FIB_LOOKUP_MARK    = (1U << 5),
->>>>>>> upstream/sched_ext
+	BPF_FIB_LOOKUP_MARK = (1U << 5),
 };
 
 enum {
@@ -7229,24 +7207,19 @@ struct bpf_fib_lookup {
 		__u32 tbid;
 	};
 
-<<<<<<< HEAD
-	__u8 smac[6]; /* ETH_ALEN */
-	__u8 dmac[6]; /* ETH_ALEN */
-=======
 	union {
 		/* input */
 		struct {
-			__u32	mark;   /* policy routing */
+			__u32 mark; /* policy routing */
 			/* 2 4-byte holes for input */
 		};
 
 		/* output: source and dest mac */
 		struct {
-			__u8	smac[6];	/* ETH_ALEN */
-			__u8	dmac[6];	/* ETH_ALEN */
+			__u8 smac[6]; /* ETH_ALEN */
+			__u8 dmac[6]; /* ETH_ALEN */
 		};
 	};
->>>>>>> upstream/sched_ext
 };
 
 struct bpf_redir_neigh {
