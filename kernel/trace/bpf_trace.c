@@ -39,7 +39,7 @@
 #define CREATE_TRACE_POINTS
 #include "bpf_trace.h"
 
-#define bpf_event_rcu_dereference(p)					\
+#define bpf_event_rcu_dereference(p) \
 	rcu_dereference_protected(p, lockdep_is_held(&bpf_event_mutex))
 
 #define MAX_UPROBE_MULTI_CNT (1U << 20)
@@ -144,11 +144,11 @@ unsigned int trace_call_bpf(struct trace_event_call *call, void *ctx)
 	 * rcu_dereference() which is accepted risk.
 	 */
 	rcu_read_lock();
-	ret = bpf_prog_run_array(rcu_dereference(call->prog_array),
-				 ctx, bpf_prog_run);
+	ret = bpf_prog_run_array(rcu_dereference(call->prog_array), ctx,
+				 bpf_prog_run);
 	rcu_read_unlock();
 
- out:
+out:
 	__this_cpu_dec(bpf_prog_active);
 
 	return ret;
@@ -163,11 +163,11 @@ BPF_CALL_2(bpf_override_return, struct pt_regs *, regs, unsigned long, rc)
 }
 
 static const struct bpf_func_proto bpf_override_return_proto = {
-	.func		= bpf_override_return,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
-	.arg2_type	= ARG_ANYTHING,
+	.func = bpf_override_return,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
+	.arg2_type = ARG_ANYTHING,
 };
 #endif
 
@@ -182,19 +182,19 @@ bpf_probe_read_user_common(void *dst, u32 size, const void __user *unsafe_ptr)
 	return ret;
 }
 
-BPF_CALL_3(bpf_probe_read_user, void *, dst, u32, size,
-	   const void __user *, unsafe_ptr)
+BPF_CALL_3(bpf_probe_read_user, void *, dst, u32, size, const void __user *,
+	   unsafe_ptr)
 {
 	return bpf_probe_read_user_common(dst, size, unsafe_ptr);
 }
 
 const struct bpf_func_proto bpf_probe_read_user_proto = {
-	.func		= bpf_probe_read_user,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
-	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
-	.arg3_type	= ARG_ANYTHING,
+	.func = bpf_probe_read_user,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg2_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg3_type = ARG_ANYTHING,
 };
 
 static __always_inline int
@@ -219,34 +219,34 @@ bpf_probe_read_user_str_common(void *dst, u32 size,
 	return ret;
 }
 
-BPF_CALL_3(bpf_probe_read_user_str, void *, dst, u32, size,
-	   const void __user *, unsafe_ptr)
+BPF_CALL_3(bpf_probe_read_user_str, void *, dst, u32, size, const void __user *,
+	   unsafe_ptr)
 {
 	return bpf_probe_read_user_str_common(dst, size, unsafe_ptr);
 }
 
 const struct bpf_func_proto bpf_probe_read_user_str_proto = {
-	.func		= bpf_probe_read_user_str,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
-	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
-	.arg3_type	= ARG_ANYTHING,
+	.func = bpf_probe_read_user_str,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg2_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg3_type = ARG_ANYTHING,
 };
 
-BPF_CALL_3(bpf_probe_read_kernel, void *, dst, u32, size,
-	   const void *, unsafe_ptr)
+BPF_CALL_3(bpf_probe_read_kernel, void *, dst, u32, size, const void *,
+	   unsafe_ptr)
 {
 	return bpf_probe_read_kernel_common(dst, size, unsafe_ptr);
 }
 
 const struct bpf_func_proto bpf_probe_read_kernel_proto = {
-	.func		= bpf_probe_read_kernel,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
-	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
-	.arg3_type	= ARG_ANYTHING,
+	.func = bpf_probe_read_kernel,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg2_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg3_type = ARG_ANYTHING,
 };
 
 static __always_inline int
@@ -269,58 +269,58 @@ bpf_probe_read_kernel_str_common(void *dst, u32 size, const void *unsafe_ptr)
 	return ret;
 }
 
-BPF_CALL_3(bpf_probe_read_kernel_str, void *, dst, u32, size,
-	   const void *, unsafe_ptr)
+BPF_CALL_3(bpf_probe_read_kernel_str, void *, dst, u32, size, const void *,
+	   unsafe_ptr)
 {
 	return bpf_probe_read_kernel_str_common(dst, size, unsafe_ptr);
 }
 
 const struct bpf_func_proto bpf_probe_read_kernel_str_proto = {
-	.func		= bpf_probe_read_kernel_str,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
-	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
-	.arg3_type	= ARG_ANYTHING,
+	.func = bpf_probe_read_kernel_str,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg2_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg3_type = ARG_ANYTHING,
 };
 
 #ifdef CONFIG_ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE
-BPF_CALL_3(bpf_probe_read_compat, void *, dst, u32, size,
-	   const void *, unsafe_ptr)
+BPF_CALL_3(bpf_probe_read_compat, void *, dst, u32, size, const void *,
+	   unsafe_ptr)
 {
 	if ((unsigned long)unsafe_ptr < TASK_SIZE) {
-		return bpf_probe_read_user_common(dst, size,
-				(__force void __user *)unsafe_ptr);
+		return bpf_probe_read_user_common(
+			dst, size, (__force void __user *)unsafe_ptr);
 	}
 	return bpf_probe_read_kernel_common(dst, size, unsafe_ptr);
 }
 
 static const struct bpf_func_proto bpf_probe_read_compat_proto = {
-	.func		= bpf_probe_read_compat,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
-	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
-	.arg3_type	= ARG_ANYTHING,
+	.func = bpf_probe_read_compat,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg2_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg3_type = ARG_ANYTHING,
 };
 
-BPF_CALL_3(bpf_probe_read_compat_str, void *, dst, u32, size,
-	   const void *, unsafe_ptr)
+BPF_CALL_3(bpf_probe_read_compat_str, void *, dst, u32, size, const void *,
+	   unsafe_ptr)
 {
 	if ((unsigned long)unsafe_ptr < TASK_SIZE) {
-		return bpf_probe_read_user_str_common(dst, size,
-				(__force void __user *)unsafe_ptr);
+		return bpf_probe_read_user_str_common(
+			dst, size, (__force void __user *)unsafe_ptr);
 	}
 	return bpf_probe_read_kernel_str_common(dst, size, unsafe_ptr);
 }
 
 static const struct bpf_func_proto bpf_probe_read_compat_str_proto = {
-	.func		= bpf_probe_read_compat_str,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
-	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
-	.arg3_type	= ARG_ANYTHING,
+	.func = bpf_probe_read_compat_str,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg2_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg3_type = ARG_ANYTHING,
 };
 #endif /* CONFIG_ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE */
 
@@ -350,12 +350,12 @@ BPF_CALL_3(bpf_probe_write_user, void __user *, unsafe_ptr, const void *, src,
 }
 
 static const struct bpf_func_proto bpf_probe_write_user_proto = {
-	.func		= bpf_probe_write_user,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_ANYTHING,
-	.arg2_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg3_type	= ARG_CONST_SIZE,
+	.func = bpf_probe_write_user,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_ANYTHING,
+	.arg2_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg3_type = ARG_CONST_SIZE,
 };
 
 static const struct bpf_func_proto *bpf_get_probe_write_proto(void)
@@ -363,27 +363,28 @@ static const struct bpf_func_proto *bpf_get_probe_write_proto(void)
 	if (!capable(CAP_SYS_ADMIN))
 		return NULL;
 
-	pr_warn_ratelimited("%s[%d] is installing a program with bpf_probe_write_user helper that may corrupt user memory!",
-			    current->comm, task_pid_nr(current));
+	pr_warn_ratelimited(
+		"%s[%d] is installing a program with bpf_probe_write_user helper that may corrupt user memory!",
+		current->comm, task_pid_nr(current));
 
 	return &bpf_probe_write_user_proto;
 }
 
-#define MAX_TRACE_PRINTK_VARARGS	3
-#define BPF_TRACE_PRINTK_SIZE		1024
+#define MAX_TRACE_PRINTK_VARARGS 3
+#define BPF_TRACE_PRINTK_SIZE 1024
 
-BPF_CALL_5(bpf_trace_printk, char *, fmt, u32, fmt_size, u64, arg1,
-	   u64, arg2, u64, arg3)
+BPF_CALL_5(bpf_trace_printk, char *, fmt, u32, fmt_size, u64, arg1, u64, arg2,
+	   u64, arg3)
 {
 	u64 args[MAX_TRACE_PRINTK_VARARGS] = { arg1, arg2, arg3 };
 	struct bpf_bprintf_data data = {
-		.get_bin_args	= true,
-		.get_buf	= true,
+		.get_bin_args = true,
+		.get_buf = true,
 	};
 	int ret;
 
-	ret = bpf_bprintf_prepare(fmt, fmt_size, args,
-				  MAX_TRACE_PRINTK_VARARGS, &data);
+	ret = bpf_bprintf_prepare(fmt, fmt_size, args, MAX_TRACE_PRINTK_VARARGS,
+				  &data);
 	if (ret < 0)
 		return ret;
 
@@ -397,11 +398,11 @@ BPF_CALL_5(bpf_trace_printk, char *, fmt, u32, fmt_size, u64, arg1,
 }
 
 static const struct bpf_func_proto bpf_trace_printk_proto = {
-	.func		= bpf_trace_printk,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg2_type	= ARG_CONST_SIZE,
+	.func = bpf_trace_printk,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg2_type = ARG_CONST_SIZE,
 };
 
 static void __set_printk_clr_event(void)
@@ -428,8 +429,8 @@ BPF_CALL_4(bpf_trace_vprintk, char *, fmt, u32, fmt_size, const void *, args,
 	   u32, data_len)
 {
 	struct bpf_bprintf_data data = {
-		.get_bin_args	= true,
-		.get_buf	= true,
+		.get_bin_args = true,
+		.get_buf = true,
 	};
 	int ret, num_args;
 
@@ -452,13 +453,13 @@ BPF_CALL_4(bpf_trace_vprintk, char *, fmt, u32, fmt_size, const void *, args,
 }
 
 static const struct bpf_func_proto bpf_trace_vprintk_proto = {
-	.func		= bpf_trace_vprintk,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg2_type	= ARG_CONST_SIZE,
-	.arg3_type	= ARG_PTR_TO_MEM | PTR_MAYBE_NULL | MEM_RDONLY,
-	.arg4_type	= ARG_CONST_SIZE_OR_ZERO,
+	.func = bpf_trace_vprintk,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg2_type = ARG_CONST_SIZE,
+	.arg3_type = ARG_PTR_TO_MEM | PTR_MAYBE_NULL | MEM_RDONLY,
+	.arg4_type = ARG_CONST_SIZE_OR_ZERO,
 };
 
 const struct bpf_func_proto *bpf_get_trace_vprintk_proto(void)
@@ -471,7 +472,7 @@ BPF_CALL_5(bpf_seq_printf, struct seq_file *, m, char *, fmt, u32, fmt_size,
 	   const void *, args, u32, data_len)
 {
 	struct bpf_bprintf_data data = {
-		.get_bin_args	= true,
+		.get_bin_args = true,
 	};
 	int err, num_args;
 
@@ -494,15 +495,15 @@ BPF_CALL_5(bpf_seq_printf, struct seq_file *, m, char *, fmt, u32, fmt_size,
 BTF_ID_LIST_SINGLE(btf_seq_file_ids, struct, seq_file)
 
 static const struct bpf_func_proto bpf_seq_printf_proto = {
-	.func		= bpf_seq_printf,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_BTF_ID,
-	.arg1_btf_id	= &btf_seq_file_ids[0],
-	.arg2_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg3_type	= ARG_CONST_SIZE,
-	.arg4_type      = ARG_PTR_TO_MEM | PTR_MAYBE_NULL | MEM_RDONLY,
-	.arg5_type      = ARG_CONST_SIZE_OR_ZERO,
+	.func = bpf_seq_printf,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_BTF_ID,
+	.arg1_btf_id = &btf_seq_file_ids[0],
+	.arg2_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg3_type = ARG_CONST_SIZE,
+	.arg4_type = ARG_PTR_TO_MEM | PTR_MAYBE_NULL | MEM_RDONLY,
+	.arg5_type = ARG_CONST_SIZE_OR_ZERO,
 };
 
 BPF_CALL_3(bpf_seq_write, struct seq_file *, m, const void *, data, u32, len)
@@ -511,17 +512,17 @@ BPF_CALL_3(bpf_seq_write, struct seq_file *, m, const void *, data, u32, len)
 }
 
 static const struct bpf_func_proto bpf_seq_write_proto = {
-	.func		= bpf_seq_write,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_BTF_ID,
-	.arg1_btf_id	= &btf_seq_file_ids[0],
-	.arg2_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg3_type	= ARG_CONST_SIZE_OR_ZERO,
+	.func = bpf_seq_write,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_BTF_ID,
+	.arg1_btf_id = &btf_seq_file_ids[0],
+	.arg2_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg3_type = ARG_CONST_SIZE_OR_ZERO,
 };
 
-BPF_CALL_4(bpf_seq_printf_btf, struct seq_file *, m, struct btf_ptr *, ptr,
-	   u32, btf_ptr_size, u64, flags)
+BPF_CALL_4(bpf_seq_printf_btf, struct seq_file *, m, struct btf_ptr *, ptr, u32,
+	   btf_ptr_size, u64, flags)
 {
 	const struct btf *btf;
 	s32 btf_id;
@@ -535,19 +536,19 @@ BPF_CALL_4(bpf_seq_printf_btf, struct seq_file *, m, struct btf_ptr *, ptr,
 }
 
 static const struct bpf_func_proto bpf_seq_printf_btf_proto = {
-	.func		= bpf_seq_printf_btf,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_BTF_ID,
-	.arg1_btf_id	= &btf_seq_file_ids[0],
-	.arg2_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg3_type	= ARG_CONST_SIZE_OR_ZERO,
-	.arg4_type	= ARG_ANYTHING,
+	.func = bpf_seq_printf_btf,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_BTF_ID,
+	.arg1_btf_id = &btf_seq_file_ids[0],
+	.arg2_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg3_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg4_type = ARG_ANYTHING,
 };
 
-static __always_inline int
-get_map_perf_counter(struct bpf_map *map, u64 flags,
-		     u64 *value, u64 *enabled, u64 *running)
+static __always_inline int get_map_perf_counter(struct bpf_map *map, u64 flags,
+						u64 *value, u64 *enabled,
+						u64 *running)
 {
 	struct bpf_array *array = container_of(map, struct bpf_array, map);
 	unsigned int cpu = smp_processor_id();
@@ -584,11 +585,11 @@ BPF_CALL_2(bpf_perf_event_read, struct bpf_map *, map, u64, flags)
 }
 
 static const struct bpf_func_proto bpf_perf_event_read_proto = {
-	.func		= bpf_perf_event_read,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_CONST_MAP_PTR,
-	.arg2_type	= ARG_ANYTHING,
+	.func = bpf_perf_event_read,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_CONST_MAP_PTR,
+	.arg2_type = ARG_ANYTHING,
 };
 
 BPF_CALL_4(bpf_perf_event_read_value, struct bpf_map *, map, u64, flags,
@@ -609,18 +610,19 @@ clear:
 }
 
 static const struct bpf_func_proto bpf_perf_event_read_value_proto = {
-	.func		= bpf_perf_event_read_value,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_CONST_MAP_PTR,
-	.arg2_type	= ARG_ANYTHING,
-	.arg3_type	= ARG_PTR_TO_UNINIT_MEM,
-	.arg4_type	= ARG_CONST_SIZE,
+	.func = bpf_perf_event_read_value,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_CONST_MAP_PTR,
+	.arg2_type = ARG_ANYTHING,
+	.arg3_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg4_type = ARG_CONST_SIZE,
 };
 
-static __always_inline u64
-__bpf_perf_event_output(struct pt_regs *regs, struct bpf_map *map,
-			u64 flags, struct perf_sample_data *sd)
+static __always_inline u64 __bpf_perf_event_output(struct pt_regs *regs,
+						   struct bpf_map *map,
+						   u64 flags,
+						   struct perf_sample_data *sd)
 {
 	struct bpf_array *array = container_of(map, struct bpf_array, map);
 	unsigned int cpu = smp_processor_id();
@@ -698,14 +700,14 @@ out:
 }
 
 static const struct bpf_func_proto bpf_perf_event_output_proto = {
-	.func		= bpf_perf_event_output,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
-	.arg2_type	= ARG_CONST_MAP_PTR,
-	.arg3_type	= ARG_ANYTHING,
-	.arg4_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg5_type	= ARG_CONST_SIZE_OR_ZERO,
+	.func = bpf_perf_event_output,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
+	.arg2_type = ARG_CONST_MAP_PTR,
+	.arg3_type = ARG_ANYTHING,
+	.arg4_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg5_type = ARG_CONST_SIZE_OR_ZERO,
 };
 
 static DEFINE_PER_CPU(int, bpf_event_output_nest_level);
@@ -719,9 +721,9 @@ u64 bpf_event_output(struct bpf_map *map, u64 flags, void *meta, u64 meta_size,
 		     void *ctx, u64 ctx_size, bpf_ctx_copy_t ctx_copy)
 {
 	struct perf_raw_frag frag = {
-		.copy		= ctx_copy,
-		.size		= ctx_size,
-		.data		= ctx,
+		.copy = ctx_copy,
+		.size = ctx_size,
+		.data = ctx,
 	};
 	struct perf_raw_record raw = {
 		.frag = {
@@ -760,42 +762,42 @@ out:
 
 BPF_CALL_0(bpf_get_current_task)
 {
-	return (long) current;
+	return (long)current;
 }
 
 const struct bpf_func_proto bpf_get_current_task_proto = {
-	.func		= bpf_get_current_task,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
+	.func = bpf_get_current_task,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
 };
 
 BPF_CALL_0(bpf_get_current_task_btf)
 {
-	return (unsigned long) current;
+	return (unsigned long)current;
 }
 
 const struct bpf_func_proto bpf_get_current_task_btf_proto = {
-	.func		= bpf_get_current_task_btf,
-	.gpl_only	= true,
-	.ret_type	= RET_PTR_TO_BTF_ID_TRUSTED,
-	.ret_btf_id	= &btf_tracing_ids[BTF_TRACING_TYPE_TASK],
+	.func = bpf_get_current_task_btf,
+	.gpl_only = true,
+	.ret_type = RET_PTR_TO_BTF_ID_TRUSTED,
+	.ret_btf_id = &btf_tracing_ids[BTF_TRACING_TYPE_TASK],
 };
 
 BPF_CALL_1(bpf_task_pt_regs, struct task_struct *, task)
 {
-	return (unsigned long) task_pt_regs(task);
+	return (unsigned long)task_pt_regs(task);
 }
 
 BTF_ID_LIST(bpf_task_pt_regs_ids)
 BTF_ID(struct, pt_regs)
 
 const struct bpf_func_proto bpf_task_pt_regs_proto = {
-	.func		= bpf_task_pt_regs,
-	.gpl_only	= true,
-	.arg1_type	= ARG_PTR_TO_BTF_ID,
-	.arg1_btf_id	= &btf_tracing_ids[BTF_TRACING_TYPE_TASK],
-	.ret_type	= RET_PTR_TO_BTF_ID,
-	.ret_btf_id	= &bpf_task_pt_regs_ids[0],
+	.func = bpf_task_pt_regs,
+	.gpl_only = true,
+	.arg1_type = ARG_PTR_TO_BTF_ID,
+	.arg1_btf_id = &btf_tracing_ids[BTF_TRACING_TYPE_TASK],
+	.ret_type = RET_PTR_TO_BTF_ID,
+	.ret_btf_id = &bpf_task_pt_regs_ids[0],
 };
 
 BPF_CALL_2(bpf_current_task_under_cgroup, struct bpf_map *, map, u32, idx)
@@ -814,11 +816,11 @@ BPF_CALL_2(bpf_current_task_under_cgroup, struct bpf_map *, map, u32, idx)
 }
 
 static const struct bpf_func_proto bpf_current_task_under_cgroup_proto = {
-	.func           = bpf_current_task_under_cgroup,
-	.gpl_only       = false,
-	.ret_type       = RET_INTEGER,
-	.arg1_type      = ARG_CONST_MAP_PTR,
-	.arg2_type      = ARG_ANYTHING,
+	.func = bpf_current_task_under_cgroup,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_CONST_MAP_PTR,
+	.arg2_type = ARG_ANYTHING,
 };
 
 struct send_signal_irq_work {
@@ -887,10 +889,10 @@ BPF_CALL_1(bpf_send_signal, u32, sig)
 }
 
 static const struct bpf_func_proto bpf_send_signal_proto = {
-	.func		= bpf_send_signal,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_ANYTHING,
+	.func = bpf_send_signal,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_ANYTHING,
 };
 
 BPF_CALL_1(bpf_send_signal_thread, u32, sig)
@@ -899,10 +901,10 @@ BPF_CALL_1(bpf_send_signal_thread, u32, sig)
 }
 
 static const struct bpf_func_proto bpf_send_signal_thread_proto = {
-	.func		= bpf_send_signal_thread,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_ANYTHING,
+	.func = bpf_send_signal_thread,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_ANYTHING,
 };
 
 BPF_CALL_3(bpf_d_path, struct path *, path, char *, buf, u32, sz)
@@ -966,18 +968,17 @@ static bool bpf_d_path_allowed(const struct bpf_prog *prog)
 BTF_ID_LIST_SINGLE(bpf_d_path_btf_ids, struct, path)
 
 static const struct bpf_func_proto bpf_d_path_proto = {
-	.func		= bpf_d_path,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_BTF_ID,
-	.arg1_btf_id	= &bpf_d_path_btf_ids[0],
-	.arg2_type	= ARG_PTR_TO_MEM,
-	.arg3_type	= ARG_CONST_SIZE_OR_ZERO,
-	.allowed	= bpf_d_path_allowed,
+	.func = bpf_d_path,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_BTF_ID,
+	.arg1_btf_id = &bpf_d_path_btf_ids[0],
+	.arg2_type = ARG_PTR_TO_MEM,
+	.arg3_type = ARG_CONST_SIZE_OR_ZERO,
+	.allowed = bpf_d_path_allowed,
 };
 
-#define BTF_F_ALL	(BTF_F_COMPACT  | BTF_F_NONAME | \
-			 BTF_F_PTR_RAW | BTF_F_ZERO)
+#define BTF_F_ALL (BTF_F_COMPACT | BTF_F_NONAME | BTF_F_PTR_RAW | BTF_F_ZERO)
 
 static int bpf_btf_printf_prepare(struct btf_ptr *ptr, u32 btf_ptr_size,
 				  u64 flags, const struct btf **btf,
@@ -1025,14 +1026,14 @@ BPF_CALL_5(bpf_snprintf_btf, char *, str, u32, str_size, struct btf_ptr *, ptr,
 }
 
 const struct bpf_func_proto bpf_snprintf_btf_proto = {
-	.func		= bpf_snprintf_btf,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_MEM,
-	.arg2_type	= ARG_CONST_SIZE,
-	.arg3_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg4_type	= ARG_CONST_SIZE,
-	.arg5_type	= ARG_ANYTHING,
+	.func = bpf_snprintf_btf,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_MEM,
+	.arg2_type = ARG_CONST_SIZE,
+	.arg3_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg4_type = ARG_CONST_SIZE,
+	.arg5_type = ARG_ANYTHING,
 };
 
 BPF_CALL_1(bpf_get_func_ip_tracing, void *, ctx)
@@ -1042,10 +1043,10 @@ BPF_CALL_1(bpf_get_func_ip_tracing, void *, ctx)
 }
 
 static const struct bpf_func_proto bpf_get_func_ip_proto_tracing = {
-	.func		= bpf_get_func_ip_tracing,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
+	.func = bpf_get_func_ip_tracing,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
 };
 
 #ifdef CONFIG_X86_KERNEL_IBT
@@ -1057,7 +1058,8 @@ static unsigned long get_entry_ip(unsigned long fentry_ip)
 	 * but otherwise we need to avoid get_kernel_nofault()'s overhead.
 	 */
 	if ((fentry_ip & ~PAGE_MASK) < ENDBR_INSN_SIZE) {
-		if (get_kernel_nofault(instr, (u32 *)(fentry_ip - ENDBR_INSN_SIZE)))
+		if (get_kernel_nofault(instr,
+				       (u32 *)(fentry_ip - ENDBR_INSN_SIZE)))
 			return fentry_ip;
 	} else {
 		instr = *(u32 *)(fentry_ip - ENDBR_INSN_SIZE);
@@ -1076,9 +1078,11 @@ BPF_CALL_1(bpf_get_func_ip_kprobe, struct pt_regs *, regs)
 	struct kprobe *kp;
 
 #ifdef CONFIG_UPROBES
-	run_ctx = container_of(current->bpf_ctx, struct bpf_trace_run_ctx, run_ctx);
+	run_ctx = container_of(current->bpf_ctx, struct bpf_trace_run_ctx,
+			       run_ctx);
 	if (run_ctx->is_uprobe)
-		return ((struct uprobe_dispatch_data *)current->utask->vaddr)->bp_addr;
+		return ((struct uprobe_dispatch_data *)current->utask->vaddr)
+			->bp_addr;
 #endif
 
 	kp = kprobe_running();
@@ -1090,10 +1094,10 @@ BPF_CALL_1(bpf_get_func_ip_kprobe, struct pt_regs *, regs)
 }
 
 static const struct bpf_func_proto bpf_get_func_ip_proto_kprobe = {
-	.func		= bpf_get_func_ip_kprobe,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
+	.func = bpf_get_func_ip_kprobe,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
 };
 
 BPF_CALL_1(bpf_get_func_ip_kprobe_multi, struct pt_regs *, regs)
@@ -1102,10 +1106,10 @@ BPF_CALL_1(bpf_get_func_ip_kprobe_multi, struct pt_regs *, regs)
 }
 
 static const struct bpf_func_proto bpf_get_func_ip_proto_kprobe_multi = {
-	.func		= bpf_get_func_ip_kprobe_multi,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
+	.func = bpf_get_func_ip_kprobe_multi,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
 };
 
 BPF_CALL_1(bpf_get_attach_cookie_kprobe_multi, struct pt_regs *, regs)
@@ -1114,10 +1118,10 @@ BPF_CALL_1(bpf_get_attach_cookie_kprobe_multi, struct pt_regs *, regs)
 }
 
 static const struct bpf_func_proto bpf_get_attach_cookie_proto_kmulti = {
-	.func		= bpf_get_attach_cookie_kprobe_multi,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
+	.func = bpf_get_attach_cookie_kprobe_multi,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
 };
 
 BPF_CALL_1(bpf_get_func_ip_uprobe_multi, struct pt_regs *, regs)
@@ -1126,10 +1130,10 @@ BPF_CALL_1(bpf_get_func_ip_uprobe_multi, struct pt_regs *, regs)
 }
 
 static const struct bpf_func_proto bpf_get_func_ip_proto_uprobe_multi = {
-	.func		= bpf_get_func_ip_uprobe_multi,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
+	.func = bpf_get_func_ip_uprobe_multi,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
 };
 
 BPF_CALL_1(bpf_get_attach_cookie_uprobe_multi, struct pt_regs *, regs)
@@ -1138,25 +1142,26 @@ BPF_CALL_1(bpf_get_attach_cookie_uprobe_multi, struct pt_regs *, regs)
 }
 
 static const struct bpf_func_proto bpf_get_attach_cookie_proto_umulti = {
-	.func		= bpf_get_attach_cookie_uprobe_multi,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
+	.func = bpf_get_attach_cookie_uprobe_multi,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
 };
 
 BPF_CALL_1(bpf_get_attach_cookie_trace, void *, ctx)
 {
 	struct bpf_trace_run_ctx *run_ctx;
 
-	run_ctx = container_of(current->bpf_ctx, struct bpf_trace_run_ctx, run_ctx);
+	run_ctx = container_of(current->bpf_ctx, struct bpf_trace_run_ctx,
+			       run_ctx);
 	return run_ctx->bpf_cookie;
 }
 
 static const struct bpf_func_proto bpf_get_attach_cookie_proto_trace = {
-	.func		= bpf_get_attach_cookie_trace,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
+	.func = bpf_get_attach_cookie_trace,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
 };
 
 BPF_CALL_1(bpf_get_attach_cookie_pe, struct bpf_perf_event_data_kern *, ctx)
@@ -1165,25 +1170,26 @@ BPF_CALL_1(bpf_get_attach_cookie_pe, struct bpf_perf_event_data_kern *, ctx)
 }
 
 static const struct bpf_func_proto bpf_get_attach_cookie_proto_pe = {
-	.func		= bpf_get_attach_cookie_pe,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
+	.func = bpf_get_attach_cookie_pe,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
 };
 
 BPF_CALL_1(bpf_get_attach_cookie_tracing, void *, ctx)
 {
 	struct bpf_trace_run_ctx *run_ctx;
 
-	run_ctx = container_of(current->bpf_ctx, struct bpf_trace_run_ctx, run_ctx);
+	run_ctx = container_of(current->bpf_ctx, struct bpf_trace_run_ctx,
+			       run_ctx);
 	return run_ctx->bpf_cookie;
 }
 
 static const struct bpf_func_proto bpf_get_attach_cookie_proto_tracing = {
-	.func		= bpf_get_attach_cookie_tracing,
-	.gpl_only	= false,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
+	.func = bpf_get_attach_cookie_tracing,
+	.gpl_only = false,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
 };
 
 BPF_CALL_3(bpf_get_branch_snapshot, void *, buf, u32, size, u64, flags)
@@ -1207,11 +1213,11 @@ BPF_CALL_3(bpf_get_branch_snapshot, void *, buf, u32, size, u64, flags)
 }
 
 static const struct bpf_func_proto bpf_get_branch_snapshot_proto = {
-	.func		= bpf_get_branch_snapshot,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
-	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
+	.func = bpf_get_branch_snapshot,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg2_type = ARG_CONST_SIZE_OR_ZERO,
 };
 
 BPF_CALL_3(get_func_arg, void *, ctx, u32, n, u64 *, value)
@@ -1219,18 +1225,18 @@ BPF_CALL_3(get_func_arg, void *, ctx, u32, n, u64 *, value)
 	/* This helper call is inlined by verifier. */
 	u64 nr_args = ((u64 *)ctx)[-1];
 
-	if ((u64) n >= nr_args)
+	if ((u64)n >= nr_args)
 		return -EINVAL;
 	*value = ((u64 *)ctx)[n];
 	return 0;
 }
 
 static const struct bpf_func_proto bpf_get_func_arg_proto = {
-	.func		= get_func_arg,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
-	.arg2_type	= ARG_ANYTHING,
-	.arg3_type	= ARG_PTR_TO_LONG,
+	.func = get_func_arg,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
+	.arg2_type = ARG_ANYTHING,
+	.arg3_type = ARG_PTR_TO_LONG,
 };
 
 BPF_CALL_2(get_func_ret, void *, ctx, u64 *, value)
@@ -1243,10 +1249,10 @@ BPF_CALL_2(get_func_ret, void *, ctx, u64 *, value)
 }
 
 static const struct bpf_func_proto bpf_get_func_ret_proto = {
-	.func		= get_func_ret,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
-	.arg2_type	= ARG_PTR_TO_LONG,
+	.func = get_func_ret,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
+	.arg2_type = ARG_PTR_TO_LONG,
 };
 
 BPF_CALL_1(get_func_arg_cnt, void *, ctx)
@@ -1256,9 +1262,9 @@ BPF_CALL_1(get_func_arg_cnt, void *, ctx)
 }
 
 static const struct bpf_func_proto bpf_get_func_arg_cnt_proto = {
-	.func		= get_func_arg_cnt,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
+	.func = get_func_arg_cnt,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
 };
 
 #ifdef CONFIG_KEYS
@@ -1383,8 +1389,8 @@ __bpf_kfunc void bpf_key_put(struct bpf_key *bkey)
  * Return: 0 on success, a negative value on error.
  */
 __bpf_kfunc int bpf_verify_pkcs7_signature(struct bpf_dynptr_kern *data_ptr,
-			       struct bpf_dynptr_kern *sig_ptr,
-			       struct bpf_key *trusted_keyring)
+					   struct bpf_dynptr_kern *sig_ptr,
+					   struct bpf_key *trusted_keyring)
 {
 	const void *data, *sig;
 	u32 data_len, sig_len;
@@ -1476,7 +1482,8 @@ __bpf_kfunc int bpf_get_file_xattr(struct file *file, const char *name__str,
 	ret = inode_permission(&nop_mnt_idmap, dentry->d_inode, MAY_READ);
 	if (ret)
 		return ret;
-	return __vfs_getxattr(dentry, dentry->d_inode, name__str, value, value_len);
+	return __vfs_getxattr(dentry, dentry->d_inode, name__str, value,
+			      value_len);
 }
 
 __bpf_kfunc_end_defs();
@@ -1555,24 +1562,29 @@ bpf_tracing_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_get_prandom_u32_proto;
 	case BPF_FUNC_probe_write_user:
 		return security_locked_down(LOCKDOWN_BPF_WRITE_USER) < 0 ?
-		       NULL : bpf_get_probe_write_proto();
+			       NULL :
+			       bpf_get_probe_write_proto();
 	case BPF_FUNC_probe_read_user:
 		return &bpf_probe_read_user_proto;
 	case BPF_FUNC_probe_read_kernel:
 		return security_locked_down(LOCKDOWN_BPF_READ_KERNEL) < 0 ?
-		       NULL : &bpf_probe_read_kernel_proto;
+			       NULL :
+			       &bpf_probe_read_kernel_proto;
 	case BPF_FUNC_probe_read_user_str:
 		return &bpf_probe_read_user_str_proto;
 	case BPF_FUNC_probe_read_kernel_str:
 		return security_locked_down(LOCKDOWN_BPF_READ_KERNEL) < 0 ?
-		       NULL : &bpf_probe_read_kernel_str_proto;
+			       NULL :
+			       &bpf_probe_read_kernel_str_proto;
 #ifdef CONFIG_ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE
 	case BPF_FUNC_probe_read:
 		return security_locked_down(LOCKDOWN_BPF_READ_KERNEL) < 0 ?
-		       NULL : &bpf_probe_read_compat_proto;
+			       NULL :
+			       &bpf_probe_read_compat_proto;
 	case BPF_FUNC_probe_read_str:
 		return security_locked_down(LOCKDOWN_BPF_READ_KERNEL) < 0 ?
-		       NULL : &bpf_probe_read_compat_str_proto;
+			       NULL :
+			       &bpf_probe_read_compat_str_proto;
 #endif
 #ifdef CONFIG_CGROUPS
 	case BPF_FUNC_cgrp_storage_get:
@@ -1618,6 +1630,8 @@ bpf_tracing_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		if (bpf_prog_check_recur(prog))
 			return &bpf_task_storage_delete_recur_proto;
 		return &bpf_task_storage_delete_proto;
+	case BPF_FUNC_schedule:
+		return &bpf_schedule_proto;
 	case BPF_FUNC_for_each_map_elem:
 		return &bpf_for_each_map_elem_proto;
 	case BPF_FUNC_snprintf:
@@ -1667,7 +1681,8 @@ kprobe_prog_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 }
 
 /* bpf+kprobe programs can access fields of 'struct pt_regs' */
-static bool kprobe_prog_is_valid_access(int off, int size, enum bpf_access_type type,
+static bool kprobe_prog_is_valid_access(int off, int size,
+					enum bpf_access_type type,
 					const struct bpf_prog *prog,
 					struct bpf_insn_access_aux *info)
 {
@@ -1688,12 +1703,11 @@ static bool kprobe_prog_is_valid_access(int off, int size, enum bpf_access_type 
 }
 
 const struct bpf_verifier_ops kprobe_verifier_ops = {
-	.get_func_proto  = kprobe_prog_func_proto,
+	.get_func_proto = kprobe_prog_func_proto,
 	.is_valid_access = kprobe_prog_is_valid_access,
 };
 
-const struct bpf_prog_ops kprobe_prog_ops = {
-};
+const struct bpf_prog_ops kprobe_prog_ops = {};
 
 BPF_CALL_5(bpf_perf_event_output_tp, void *, tp_buff, struct bpf_map *, map,
 	   u64, flags, void *, data, u64, size)
@@ -1709,18 +1723,18 @@ BPF_CALL_5(bpf_perf_event_output_tp, void *, tp_buff, struct bpf_map *, map,
 }
 
 static const struct bpf_func_proto bpf_perf_event_output_proto_tp = {
-	.func		= bpf_perf_event_output_tp,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
-	.arg2_type	= ARG_CONST_MAP_PTR,
-	.arg3_type	= ARG_ANYTHING,
-	.arg4_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg5_type	= ARG_CONST_SIZE_OR_ZERO,
+	.func = bpf_perf_event_output_tp,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
+	.arg2_type = ARG_CONST_MAP_PTR,
+	.arg3_type = ARG_ANYTHING,
+	.arg4_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg5_type = ARG_CONST_SIZE_OR_ZERO,
 };
 
-BPF_CALL_3(bpf_get_stackid_tp, void *, tp_buff, struct bpf_map *, map,
-	   u64, flags)
+BPF_CALL_3(bpf_get_stackid_tp, void *, tp_buff, struct bpf_map *, map, u64,
+	   flags)
 {
 	struct pt_regs *regs = *(struct pt_regs **)tp_buff;
 
@@ -1729,36 +1743,36 @@ BPF_CALL_3(bpf_get_stackid_tp, void *, tp_buff, struct bpf_map *, map,
 	 * the other helper's function body cannot be inlined due to being
 	 * external, thus we need to call raw helper function.
 	 */
-	return bpf_get_stackid((unsigned long) regs, (unsigned long) map,
-			       flags, 0, 0);
+	return bpf_get_stackid((unsigned long)regs, (unsigned long)map, flags,
+			       0, 0);
 }
 
 static const struct bpf_func_proto bpf_get_stackid_proto_tp = {
-	.func		= bpf_get_stackid_tp,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
-	.arg2_type	= ARG_CONST_MAP_PTR,
-	.arg3_type	= ARG_ANYTHING,
+	.func = bpf_get_stackid_tp,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
+	.arg2_type = ARG_CONST_MAP_PTR,
+	.arg3_type = ARG_ANYTHING,
 };
 
-BPF_CALL_4(bpf_get_stack_tp, void *, tp_buff, void *, buf, u32, size,
-	   u64, flags)
+BPF_CALL_4(bpf_get_stack_tp, void *, tp_buff, void *, buf, u32, size, u64,
+	   flags)
 {
 	struct pt_regs *regs = *(struct pt_regs **)tp_buff;
 
-	return bpf_get_stack((unsigned long) regs, (unsigned long) buf,
-			     (unsigned long) size, flags, 0);
+	return bpf_get_stack((unsigned long)regs, (unsigned long)buf,
+			     (unsigned long)size, flags, 0);
 }
 
 static const struct bpf_func_proto bpf_get_stack_proto_tp = {
-	.func		= bpf_get_stack_tp,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
-	.arg2_type	= ARG_PTR_TO_UNINIT_MEM,
-	.arg3_type	= ARG_CONST_SIZE_OR_ZERO,
-	.arg4_type	= ARG_ANYTHING,
+	.func = bpf_get_stack_tp,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
+	.arg2_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg3_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg4_type = ARG_ANYTHING,
 };
 
 static const struct bpf_func_proto *
@@ -1778,7 +1792,8 @@ tp_prog_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 	}
 }
 
-static bool tp_prog_is_valid_access(int off, int size, enum bpf_access_type type,
+static bool tp_prog_is_valid_access(int off, int size,
+				    enum bpf_access_type type,
 				    const struct bpf_prog *prog,
 				    struct bpf_insn_access_aux *info)
 {
@@ -1794,12 +1809,11 @@ static bool tp_prog_is_valid_access(int off, int size, enum bpf_access_type type
 }
 
 const struct bpf_verifier_ops tracepoint_verifier_ops = {
-	.get_func_proto  = tp_prog_func_proto,
+	.get_func_proto = tp_prog_func_proto,
 	.is_valid_access = tp_prog_is_valid_access,
 };
 
-const struct bpf_prog_ops tracepoint_prog_ops = {
-};
+const struct bpf_prog_ops tracepoint_prog_ops = {};
 
 BPF_CALL_3(bpf_perf_prog_read_value, struct bpf_perf_event_data_kern *, ctx,
 	   struct bpf_perf_event_value *, buf, u32, size)
@@ -1819,12 +1833,12 @@ clear:
 }
 
 static const struct bpf_func_proto bpf_perf_prog_read_value_proto = {
-         .func           = bpf_perf_prog_read_value,
-         .gpl_only       = true,
-         .ret_type       = RET_INTEGER,
-         .arg1_type      = ARG_PTR_TO_CTX,
-         .arg2_type      = ARG_PTR_TO_UNINIT_MEM,
-         .arg3_type      = ARG_CONST_SIZE,
+	.func = bpf_perf_prog_read_value,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
+	.arg2_type = ARG_PTR_TO_UNINIT_MEM,
+	.arg3_type = ARG_CONST_SIZE,
 };
 
 BPF_CALL_4(bpf_read_branch_records, struct bpf_perf_event_data_kern *, ctx,
@@ -1856,13 +1870,13 @@ BPF_CALL_4(bpf_read_branch_records, struct bpf_perf_event_data_kern *, ctx,
 }
 
 static const struct bpf_func_proto bpf_read_branch_records_proto = {
-	.func           = bpf_read_branch_records,
-	.gpl_only       = true,
-	.ret_type       = RET_INTEGER,
-	.arg1_type      = ARG_PTR_TO_CTX,
-	.arg2_type      = ARG_PTR_TO_MEM_OR_NULL,
-	.arg3_type      = ARG_CONST_SIZE_OR_ZERO,
-	.arg4_type      = ARG_ANYTHING,
+	.func = bpf_read_branch_records,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
+	.arg2_type = ARG_PTR_TO_MEM_OR_NULL,
+	.arg3_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg4_type = ARG_ANYTHING,
 };
 
 static const struct bpf_func_proto *
@@ -1934,14 +1948,14 @@ BPF_CALL_5(bpf_perf_event_output_raw_tp, struct bpf_raw_tracepoint_args *, args,
 }
 
 static const struct bpf_func_proto bpf_perf_event_output_proto_raw_tp = {
-	.func		= bpf_perf_event_output_raw_tp,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
-	.arg2_type	= ARG_CONST_MAP_PTR,
-	.arg3_type	= ARG_ANYTHING,
-	.arg4_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg5_type	= ARG_CONST_SIZE_OR_ZERO,
+	.func = bpf_perf_event_output_raw_tp,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
+	.arg2_type = ARG_CONST_MAP_PTR,
+	.arg3_type = ARG_ANYTHING,
+	.arg4_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg5_type = ARG_CONST_SIZE_OR_ZERO,
 };
 
 extern const struct bpf_func_proto bpf_skb_output_proto;
@@ -1959,23 +1973,23 @@ BPF_CALL_3(bpf_get_stackid_raw_tp, struct bpf_raw_tracepoint_args *, args,
 
 	perf_fetch_caller_regs(regs);
 	/* similar to bpf_perf_event_output_tp, but pt_regs fetched differently */
-	ret = bpf_get_stackid((unsigned long) regs, (unsigned long) map,
-			      flags, 0, 0);
+	ret = bpf_get_stackid((unsigned long)regs, (unsigned long)map, flags, 0,
+			      0);
 	put_bpf_raw_tp_regs();
 	return ret;
 }
 
 static const struct bpf_func_proto bpf_get_stackid_proto_raw_tp = {
-	.func		= bpf_get_stackid_raw_tp,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
-	.arg2_type	= ARG_CONST_MAP_PTR,
-	.arg3_type	= ARG_ANYTHING,
+	.func = bpf_get_stackid_raw_tp,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
+	.arg2_type = ARG_CONST_MAP_PTR,
+	.arg3_type = ARG_ANYTHING,
 };
 
-BPF_CALL_4(bpf_get_stack_raw_tp, struct bpf_raw_tracepoint_args *, args,
-	   void *, buf, u32, size, u64, flags)
+BPF_CALL_4(bpf_get_stack_raw_tp, struct bpf_raw_tracepoint_args *, args, void *,
+	   buf, u32, size, u64, flags)
 {
 	struct pt_regs *regs = get_bpf_raw_tp_regs();
 	int ret;
@@ -1984,20 +1998,20 @@ BPF_CALL_4(bpf_get_stack_raw_tp, struct bpf_raw_tracepoint_args *, args,
 		return PTR_ERR(regs);
 
 	perf_fetch_caller_regs(regs);
-	ret = bpf_get_stack((unsigned long) regs, (unsigned long) buf,
-			    (unsigned long) size, flags, 0);
+	ret = bpf_get_stack((unsigned long)regs, (unsigned long)buf,
+			    (unsigned long)size, flags, 0);
 	put_bpf_raw_tp_regs();
 	return ret;
 }
 
 static const struct bpf_func_proto bpf_get_stack_proto_raw_tp = {
-	.func		= bpf_get_stack_raw_tp,
-	.gpl_only	= true,
-	.ret_type	= RET_INTEGER,
-	.arg1_type	= ARG_PTR_TO_CTX,
-	.arg2_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
-	.arg3_type	= ARG_CONST_SIZE_OR_ZERO,
-	.arg4_type	= ARG_ANYTHING,
+	.func = bpf_get_stack_raw_tp,
+	.gpl_only = true,
+	.ret_type = RET_INTEGER,
+	.arg1_type = ARG_PTR_TO_CTX,
+	.arg2_type = ARG_PTR_TO_MEM | MEM_RDONLY,
+	.arg3_type = ARG_CONST_SIZE_OR_ZERO,
+	.arg4_type = ARG_ANYTHING,
 };
 
 static const struct bpf_func_proto *
@@ -2055,29 +2069,35 @@ tracing_prog_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 #endif
 	case BPF_FUNC_seq_printf:
 		return prog->expected_attach_type == BPF_TRACE_ITER ?
-		       &bpf_seq_printf_proto :
-		       NULL;
+			       &bpf_seq_printf_proto :
+			       NULL;
 	case BPF_FUNC_seq_write:
 		return prog->expected_attach_type == BPF_TRACE_ITER ?
-		       &bpf_seq_write_proto :
-		       NULL;
+			       &bpf_seq_write_proto :
+			       NULL;
 	case BPF_FUNC_seq_printf_btf:
 		return prog->expected_attach_type == BPF_TRACE_ITER ?
-		       &bpf_seq_printf_btf_proto :
-		       NULL;
+			       &bpf_seq_printf_btf_proto :
+			       NULL;
 	case BPF_FUNC_d_path:
 		return &bpf_d_path_proto;
 	case BPF_FUNC_get_func_arg:
-		return bpf_prog_has_trampoline(prog) ? &bpf_get_func_arg_proto : NULL;
+		return bpf_prog_has_trampoline(prog) ? &bpf_get_func_arg_proto :
+						       NULL;
 	case BPF_FUNC_get_func_ret:
-		return bpf_prog_has_trampoline(prog) ? &bpf_get_func_ret_proto : NULL;
+		return bpf_prog_has_trampoline(prog) ? &bpf_get_func_ret_proto :
+						       NULL;
 	case BPF_FUNC_get_func_arg_cnt:
-		return bpf_prog_has_trampoline(prog) ? &bpf_get_func_arg_cnt_proto : NULL;
+		return bpf_prog_has_trampoline(prog) ?
+			       &bpf_get_func_arg_cnt_proto :
+			       NULL;
 	case BPF_FUNC_get_attach_cookie:
 		if (prog->type == BPF_PROG_TYPE_TRACING &&
 		    prog->expected_attach_type == BPF_TRACE_RAW_TP)
 			return &bpf_get_attach_cookie_proto_tracing;
-		return bpf_prog_has_trampoline(prog) ? &bpf_get_attach_cookie_proto_tracing : NULL;
+		return bpf_prog_has_trampoline(prog) ?
+			       &bpf_get_attach_cookie_proto_tracing :
+			       NULL;
 	default:
 		fn = raw_tp_prog_func_proto(func_id, prog);
 		if (!fn && prog->expected_attach_type == BPF_TRACE_ITER)
@@ -2110,7 +2130,7 @@ int __weak bpf_prog_test_run_tracing(struct bpf_prog *prog,
 }
 
 const struct bpf_verifier_ops raw_tracepoint_verifier_ops = {
-	.get_func_proto  = raw_tp_prog_func_proto,
+	.get_func_proto = raw_tp_prog_func_proto,
 	.is_valid_access = raw_tp_prog_is_valid_access,
 };
 
@@ -2121,7 +2141,7 @@ const struct bpf_prog_ops raw_tracepoint_prog_ops = {
 };
 
 const struct bpf_verifier_ops tracing_verifier_ops = {
-	.get_func_proto  = tracing_prog_func_proto,
+	.get_func_proto = tracing_prog_func_proto,
 	.is_valid_access = tracing_prog_is_valid_access,
 };
 
@@ -2129,10 +2149,9 @@ const struct bpf_prog_ops tracing_prog_ops = {
 	.test_run = bpf_prog_test_run_tracing,
 };
 
-static bool raw_tp_writable_prog_is_valid_access(int off, int size,
-						 enum bpf_access_type type,
-						 const struct bpf_prog *prog,
-						 struct bpf_insn_access_aux *info)
+static bool raw_tp_writable_prog_is_valid_access(
+	int off, int size, enum bpf_access_type type,
+	const struct bpf_prog *prog, struct bpf_insn_access_aux *info)
 {
 	if (off == 0) {
 		if (size != sizeof(u64) || type != BPF_READ)
@@ -2143,14 +2162,14 @@ static bool raw_tp_writable_prog_is_valid_access(int off, int size,
 }
 
 const struct bpf_verifier_ops raw_tracepoint_writable_verifier_ops = {
-	.get_func_proto  = raw_tp_prog_func_proto,
+	.get_func_proto = raw_tp_prog_func_proto,
 	.is_valid_access = raw_tp_writable_prog_is_valid_access,
 };
 
-const struct bpf_prog_ops raw_tracepoint_writable_prog_ops = {
-};
+const struct bpf_prog_ops raw_tracepoint_writable_prog_ops = {};
 
-static bool pe_prog_is_valid_access(int off, int size, enum bpf_access_type type,
+static bool pe_prog_is_valid_access(int off, int size,
+				    enum bpf_access_type type,
 				    const struct bpf_prog *prog,
 				    struct bpf_insn_access_aux *info)
 {
@@ -2197,27 +2216,30 @@ static u32 pe_prog_convert_ctx_access(enum bpf_access_type type,
 
 	switch (si->off) {
 	case offsetof(struct bpf_perf_event_data, sample_period):
-		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct bpf_perf_event_data_kern,
-						       data), si->dst_reg, si->src_reg,
-				      offsetof(struct bpf_perf_event_data_kern, data));
+		*insn++ = BPF_LDX_MEM(
+			BPF_FIELD_SIZEOF(struct bpf_perf_event_data_kern, data),
+			si->dst_reg, si->src_reg,
+			offsetof(struct bpf_perf_event_data_kern, data));
 		*insn++ = BPF_LDX_MEM(BPF_DW, si->dst_reg, si->dst_reg,
-				      bpf_target_off(struct perf_sample_data, period, 8,
-						     target_size));
+				      bpf_target_off(struct perf_sample_data,
+						     period, 8, target_size));
 		break;
 	case offsetof(struct bpf_perf_event_data, addr):
-		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct bpf_perf_event_data_kern,
-						       data), si->dst_reg, si->src_reg,
-				      offsetof(struct bpf_perf_event_data_kern, data));
+		*insn++ = BPF_LDX_MEM(
+			BPF_FIELD_SIZEOF(struct bpf_perf_event_data_kern, data),
+			si->dst_reg, si->src_reg,
+			offsetof(struct bpf_perf_event_data_kern, data));
 		*insn++ = BPF_LDX_MEM(BPF_DW, si->dst_reg, si->dst_reg,
-				      bpf_target_off(struct perf_sample_data, addr, 8,
-						     target_size));
+				      bpf_target_off(struct perf_sample_data,
+						     addr, 8, target_size));
 		break;
 	default:
-		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct bpf_perf_event_data_kern,
-						       regs), si->dst_reg, si->src_reg,
-				      offsetof(struct bpf_perf_event_data_kern, regs));
-		*insn++ = BPF_LDX_MEM(BPF_SIZEOF(long), si->dst_reg, si->dst_reg,
-				      si->off);
+		*insn++ = BPF_LDX_MEM(
+			BPF_FIELD_SIZEOF(struct bpf_perf_event_data_kern, regs),
+			si->dst_reg, si->src_reg,
+			offsetof(struct bpf_perf_event_data_kern, regs));
+		*insn++ = BPF_LDX_MEM(BPF_SIZEOF(long), si->dst_reg,
+				      si->dst_reg, si->off);
 		break;
 	}
 
@@ -2225,20 +2247,18 @@ static u32 pe_prog_convert_ctx_access(enum bpf_access_type type,
 }
 
 const struct bpf_verifier_ops perf_event_verifier_ops = {
-	.get_func_proto		= pe_prog_func_proto,
-	.is_valid_access	= pe_prog_is_valid_access,
-	.convert_ctx_access	= pe_prog_convert_ctx_access,
+	.get_func_proto = pe_prog_func_proto,
+	.is_valid_access = pe_prog_is_valid_access,
+	.convert_ctx_access = pe_prog_convert_ctx_access,
 };
 
-const struct bpf_prog_ops perf_event_prog_ops = {
-};
+const struct bpf_prog_ops perf_event_prog_ops = {};
 
 static DEFINE_MUTEX(bpf_event_mutex);
 
 #define BPF_TRACE_MAX_PROGS 64
 
-int perf_event_attach_bpf_prog(struct perf_event *event,
-			       struct bpf_prog *prog,
+int perf_event_attach_bpf_prog(struct perf_event *event, struct bpf_prog *prog,
 			       u64 bpf_cookie)
 {
 	struct bpf_prog_array *old_array;
@@ -2266,7 +2286,8 @@ int perf_event_attach_bpf_prog(struct perf_event *event,
 		goto unlock;
 	}
 
-	ret = bpf_prog_array_copy(old_array, NULL, prog, bpf_cookie, &new_array);
+	ret = bpf_prog_array_copy(old_array, NULL, prog, bpf_cookie,
+				  &new_array);
 	if (ret < 0)
 		goto unlock;
 
@@ -2376,8 +2397,8 @@ void bpf_put_raw_tracepoint(struct bpf_raw_event_map *btp)
 	preempt_enable();
 }
 
-static __always_inline
-void __bpf_trace_run(struct bpf_raw_tp_link *link, u64 *args)
+static __always_inline void __bpf_trace_run(struct bpf_raw_tp_link *link,
+					    u64 *args)
 {
 	struct bpf_prog *prog = link->link.prog;
 	struct bpf_run_ctx *old_run_ctx;
@@ -2393,7 +2414,7 @@ void __bpf_trace_run(struct bpf_raw_tp_link *link, u64 *args)
 	old_run_ctx = bpf_set_run_ctx(&run_ctx.run_ctx);
 
 	rcu_read_lock();
-	(void) bpf_prog_run(prog, args);
+	(void)bpf_prog_run(prog, args);
 	rcu_read_unlock();
 
 	bpf_reset_run_ctx(old_run_ctx);
@@ -2401,37 +2422,37 @@ out:
 	this_cpu_dec(*(prog->active));
 }
 
-#define UNPACK(...)			__VA_ARGS__
-#define REPEAT_1(FN, DL, X, ...)	FN(X)
-#define REPEAT_2(FN, DL, X, ...)	FN(X) UNPACK DL REPEAT_1(FN, DL, __VA_ARGS__)
-#define REPEAT_3(FN, DL, X, ...)	FN(X) UNPACK DL REPEAT_2(FN, DL, __VA_ARGS__)
-#define REPEAT_4(FN, DL, X, ...)	FN(X) UNPACK DL REPEAT_3(FN, DL, __VA_ARGS__)
-#define REPEAT_5(FN, DL, X, ...)	FN(X) UNPACK DL REPEAT_4(FN, DL, __VA_ARGS__)
-#define REPEAT_6(FN, DL, X, ...)	FN(X) UNPACK DL REPEAT_5(FN, DL, __VA_ARGS__)
-#define REPEAT_7(FN, DL, X, ...)	FN(X) UNPACK DL REPEAT_6(FN, DL, __VA_ARGS__)
-#define REPEAT_8(FN, DL, X, ...)	FN(X) UNPACK DL REPEAT_7(FN, DL, __VA_ARGS__)
-#define REPEAT_9(FN, DL, X, ...)	FN(X) UNPACK DL REPEAT_8(FN, DL, __VA_ARGS__)
-#define REPEAT_10(FN, DL, X, ...)	FN(X) UNPACK DL REPEAT_9(FN, DL, __VA_ARGS__)
-#define REPEAT_11(FN, DL, X, ...)	FN(X) UNPACK DL REPEAT_10(FN, DL, __VA_ARGS__)
-#define REPEAT_12(FN, DL, X, ...)	FN(X) UNPACK DL REPEAT_11(FN, DL, __VA_ARGS__)
-#define REPEAT(X, FN, DL, ...)		REPEAT_##X(FN, DL, __VA_ARGS__)
+#define UNPACK(...) __VA_ARGS__
+#define REPEAT_1(FN, DL, X, ...) FN(X)
+#define REPEAT_2(FN, DL, X, ...) FN(X) UNPACK DL REPEAT_1(FN, DL, __VA_ARGS__)
+#define REPEAT_3(FN, DL, X, ...) FN(X) UNPACK DL REPEAT_2(FN, DL, __VA_ARGS__)
+#define REPEAT_4(FN, DL, X, ...) FN(X) UNPACK DL REPEAT_3(FN, DL, __VA_ARGS__)
+#define REPEAT_5(FN, DL, X, ...) FN(X) UNPACK DL REPEAT_4(FN, DL, __VA_ARGS__)
+#define REPEAT_6(FN, DL, X, ...) FN(X) UNPACK DL REPEAT_5(FN, DL, __VA_ARGS__)
+#define REPEAT_7(FN, DL, X, ...) FN(X) UNPACK DL REPEAT_6(FN, DL, __VA_ARGS__)
+#define REPEAT_8(FN, DL, X, ...) FN(X) UNPACK DL REPEAT_7(FN, DL, __VA_ARGS__)
+#define REPEAT_9(FN, DL, X, ...) FN(X) UNPACK DL REPEAT_8(FN, DL, __VA_ARGS__)
+#define REPEAT_10(FN, DL, X, ...) FN(X) UNPACK DL REPEAT_9(FN, DL, __VA_ARGS__)
+#define REPEAT_11(FN, DL, X, ...) FN(X) UNPACK DL REPEAT_10(FN, DL, __VA_ARGS__)
+#define REPEAT_12(FN, DL, X, ...) FN(X) UNPACK DL REPEAT_11(FN, DL, __VA_ARGS__)
+#define REPEAT(X, FN, DL, ...) REPEAT_##X(FN, DL, __VA_ARGS__)
 
-#define SARG(X)		u64 arg##X
-#define COPY(X)		args[X] = arg##X
+#define SARG(X) u64 arg##X
+#define COPY(X) args[X] = arg##X
 
-#define __DL_COM	(,)
-#define __DL_SEM	(;)
+#define __DL_COM (, )
+#define __DL_SEM (;)
 
-#define __SEQ_0_11	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
+#define __SEQ_0_11 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 
-#define BPF_TRACE_DEFN_x(x)						\
-	void bpf_trace_run##x(struct bpf_raw_tp_link *link,		\
-			      REPEAT(x, SARG, __DL_COM, __SEQ_0_11))	\
-	{								\
-		u64 args[x];						\
-		REPEAT(x, COPY, __DL_SEM, __SEQ_0_11);			\
-		__bpf_trace_run(link, args);				\
-	}								\
+#define BPF_TRACE_DEFN_x(x)                                          \
+	void bpf_trace_run##x(struct bpf_raw_tp_link *link,          \
+			      REPEAT(x, SARG, __DL_COM, __SEQ_0_11)) \
+	{                                                            \
+		u64 args[x];                                         \
+		REPEAT(x, COPY, __DL_SEM, __SEQ_0_11);               \
+		__bpf_trace_run(link, args);                         \
+	}                                                            \
 	EXPORT_SYMBOL_GPL(bpf_trace_run##x)
 BPF_TRACE_DEFN_x(1);
 BPF_TRACE_DEFN_x(2);
@@ -2446,7 +2467,8 @@ BPF_TRACE_DEFN_x(10);
 BPF_TRACE_DEFN_x(11);
 BPF_TRACE_DEFN_x(12);
 
-int bpf_probe_register(struct bpf_raw_event_map *btp, struct bpf_raw_tp_link *link)
+int bpf_probe_register(struct bpf_raw_event_map *btp,
+		       struct bpf_raw_tp_link *link)
 {
 	struct tracepoint *tp = btp->tp;
 	struct bpf_prog *prog = link->link.prog;
@@ -2461,18 +2483,20 @@ int bpf_probe_register(struct bpf_raw_event_map *btp, struct bpf_raw_tp_link *li
 	if (prog->aux->max_tp_access > btp->writable_size)
 		return -EINVAL;
 
-	return tracepoint_probe_register_may_exist(tp, (void *)btp->bpf_func, link);
+	return tracepoint_probe_register_may_exist(tp, (void *)btp->bpf_func,
+						   link);
 }
 
-int bpf_probe_unregister(struct bpf_raw_event_map *btp, struct bpf_raw_tp_link *link)
+int bpf_probe_unregister(struct bpf_raw_event_map *btp,
+			 struct bpf_raw_tp_link *link)
 {
-	return tracepoint_probe_unregister(btp->tp, (void *)btp->bpf_func, link);
+	return tracepoint_probe_unregister(btp->tp, (void *)btp->bpf_func,
+					   link);
 }
 
 int bpf_get_perf_event_info(const struct perf_event *event, u32 *prog_id,
-			    u32 *fd_type, const char **buf,
-			    u64 *probe_offset, u64 *probe_addr,
-			    unsigned long *missed)
+			    u32 *fd_type, const char **buf, u64 *probe_offset,
+			    u64 *probe_addr, unsigned long *missed)
 {
 	bool is_tracepoint, is_syscall_tp;
 	struct bpf_prog *prog;
@@ -2492,8 +2516,8 @@ int bpf_get_perf_event_info(const struct perf_event *event, u32 *prog_id,
 	is_syscall_tp = is_syscall_trace_event(event->tp_event);
 
 	if (is_tracepoint || is_syscall_tp) {
-		*buf = is_tracepoint ? event->tp_event->tp->name
-				     : event->tp_event->name;
+		*buf = is_tracepoint ? event->tp_event->tp->name :
+				       event->tp_event->name;
 		/* We allow NULL pointer for tracepoint */
 		if (fd_type)
 			*fd_type = BPF_FD_TYPE_TRACEPOINT;
@@ -2506,15 +2530,16 @@ int bpf_get_perf_event_info(const struct perf_event *event, u32 *prog_id,
 		err = -EOPNOTSUPP;
 #ifdef CONFIG_KPROBE_EVENTS
 		if (flags & TRACE_EVENT_FL_KPROBE)
-			err = bpf_get_kprobe_info(event, fd_type, buf,
-						  probe_offset, probe_addr, missed,
-						  event->attr.type == PERF_TYPE_TRACEPOINT);
+			err = bpf_get_kprobe_info(
+				event, fd_type, buf, probe_offset, probe_addr,
+				missed,
+				event->attr.type == PERF_TYPE_TRACEPOINT);
 #endif
 #ifdef CONFIG_UPROBE_EVENTS
 		if (flags & TRACE_EVENT_FL_UPROBE)
-			err = bpf_get_uprobe_info(event, fd_type, buf,
-						  probe_offset, probe_addr,
-						  event->attr.type == PERF_TYPE_TRACEPOINT);
+			err = bpf_get_uprobe_info(
+				event, fd_type, buf, probe_offset, probe_addr,
+				event->attr.type == PERF_TYPE_TRACEPOINT);
 #endif
 	}
 
@@ -2612,7 +2637,8 @@ struct user_syms {
 	char *buf;
 };
 
-static int copy_user_syms(struct user_syms *us, unsigned long __user *usyms, u32 cnt)
+static int copy_user_syms(struct user_syms *us, unsigned long __user *usyms,
+			  u32 cnt)
 {
 	unsigned long __user usymbol;
 	const char **syms = NULL;
@@ -2633,7 +2659,8 @@ static int copy_user_syms(struct user_syms *us, unsigned long __user *usyms, u32
 			err = -EFAULT;
 			goto error;
 		}
-		err = strncpy_from_user(p, (const char __user *) usymbol, KSYM_NAME_LEN);
+		err = strncpy_from_user(p, (const char __user *)usymbol,
+					KSYM_NAME_LEN);
 		if (err == KSYM_NAME_LEN)
 			err = -E2BIG;
 		if (err < 0)
@@ -2716,7 +2743,8 @@ static int bpf_kprobe_multi_link_fill_link_info(const struct bpf_link *link,
 
 	if (ucookies) {
 		if (kmulti_link->cookies) {
-			if (copy_to_user(ucookies, kmulti_link->cookies, ucount * sizeof(u64)))
+			if (copy_to_user(ucookies, kmulti_link->cookies,
+					 ucount * sizeof(u64)))
 				return -EFAULT;
 		} else {
 			for (i = 0; i < ucount; i++) {
@@ -2727,7 +2755,8 @@ static int bpf_kprobe_multi_link_fill_link_info(const struct bpf_link *link,
 	}
 
 	if (kallsyms_show_value(current_cred())) {
-		if (copy_to_user(uaddrs, kmulti_link->addrs, ucount * sizeof(u64)))
+		if (copy_to_user(uaddrs, kmulti_link->addrs,
+				 ucount * sizeof(u64)))
 			return -EFAULT;
 	} else {
 		for (i = 0; i < ucount; i++) {
@@ -2744,7 +2773,8 @@ static const struct bpf_link_ops bpf_kprobe_multi_link_lops = {
 	.fill_link_info = bpf_kprobe_multi_link_fill_link_info,
 };
 
-static void bpf_kprobe_multi_cookie_swap(void *a, void *b, int size, const void *priv)
+static void bpf_kprobe_multi_cookie_swap(void *a, void *b, int size,
+					 const void *priv)
 {
 	const struct bpf_kprobe_multi_link *link = priv;
 	unsigned long *addr_a = a, *addr_b = b;
@@ -2767,7 +2797,8 @@ static int bpf_kprobe_multi_addrs_cmp(const void *a, const void *b)
 	return *addr_a < *addr_b ? -1 : 1;
 }
 
-static int bpf_kprobe_multi_cookie_cmp(const void *a, const void *b, const void *priv)
+static int bpf_kprobe_multi_cookie_cmp(const void *a, const void *b,
+				       const void *priv)
 {
 	return bpf_kprobe_multi_addrs_cmp(a, b);
 }
@@ -2781,7 +2812,8 @@ static u64 bpf_kprobe_multi_cookie(struct bpf_run_ctx *ctx)
 
 	if (WARN_ON_ONCE(!ctx))
 		return 0;
-	run_ctx = container_of(current->bpf_ctx, struct bpf_kprobe_multi_run_ctx, run_ctx);
+	run_ctx = container_of(current->bpf_ctx,
+			       struct bpf_kprobe_multi_run_ctx, run_ctx);
 	link = run_ctx->link;
 	if (!link->cookies)
 		return 0;
@@ -2798,13 +2830,14 @@ static u64 bpf_kprobe_multi_entry_ip(struct bpf_run_ctx *ctx)
 {
 	struct bpf_kprobe_multi_run_ctx *run_ctx;
 
-	run_ctx = container_of(current->bpf_ctx, struct bpf_kprobe_multi_run_ctx, run_ctx);
+	run_ctx = container_of(current->bpf_ctx,
+			       struct bpf_kprobe_multi_run_ctx, run_ctx);
 	return run_ctx->entry_ip;
 }
 
-static int
-kprobe_multi_link_prog_run(struct bpf_kprobe_multi_link *link,
-			   unsigned long entry_ip, struct pt_regs *regs)
+static int kprobe_multi_link_prog_run(struct bpf_kprobe_multi_link *link,
+				      unsigned long entry_ip,
+				      struct pt_regs *regs)
 {
 	struct bpf_kprobe_multi_run_ctx run_ctx = {
 		.link = link,
@@ -2827,15 +2860,14 @@ kprobe_multi_link_prog_run(struct bpf_kprobe_multi_link *link,
 	rcu_read_unlock();
 	migrate_enable();
 
- out:
+out:
 	__this_cpu_dec(bpf_prog_active);
 	return err;
 }
 
-static int
-kprobe_multi_link_handler(struct fprobe *fp, unsigned long fentry_ip,
-			  unsigned long ret_ip, struct pt_regs *regs,
-			  void *data)
+static int kprobe_multi_link_handler(struct fprobe *fp, unsigned long fentry_ip,
+				     unsigned long ret_ip, struct pt_regs *regs,
+				     void *data)
 {
 	struct bpf_kprobe_multi_link *link;
 
@@ -2844,10 +2876,10 @@ kprobe_multi_link_handler(struct fprobe *fp, unsigned long fentry_ip,
 	return 0;
 }
 
-static void
-kprobe_multi_link_exit_handler(struct fprobe *fp, unsigned long fentry_ip,
-			       unsigned long ret_ip, struct pt_regs *regs,
-			       void *data)
+static void kprobe_multi_link_exit_handler(struct fprobe *fp,
+					   unsigned long fentry_ip,
+					   unsigned long ret_ip,
+					   struct pt_regs *regs, void *data)
 {
 	struct bpf_kprobe_multi_link *link;
 
@@ -2857,8 +2889,8 @@ kprobe_multi_link_exit_handler(struct fprobe *fp, unsigned long fentry_ip,
 
 static int symbols_cmp_r(const void *a, const void *b, const void *priv)
 {
-	const char **str_a = (const char **) a;
-	const char **str_b = (const char **) b;
+	const char **str_a = (const char **)a;
+	const char **str_b = (const char **)b;
 
 	return strcmp(*str_a, *str_b);
 }
@@ -2897,7 +2929,8 @@ static int add_module(struct modules_array *arr, struct module *mod)
 
 	if (arr->mods_cnt == arr->mods_cap) {
 		arr->mods_cap = max(16, arr->mods_cap * 3 / 2);
-		mods = krealloc_array(arr->mods, arr->mods_cap, sizeof(*mods), GFP_KERNEL);
+		mods = krealloc_array(arr->mods, arr->mods_cap, sizeof(*mods),
+				      GFP_KERNEL);
 		if (!mods)
 			return -ENOMEM;
 		arr->mods = mods;
@@ -2919,7 +2952,8 @@ static bool has_module(struct modules_array *arr, struct module *mod)
 	return false;
 }
 
-static int get_modules_for_addrs(struct module ***mods, unsigned long *addrs, u32 addrs_cnt)
+static int get_modules_for_addrs(struct module ***mods, unsigned long *addrs,
+				 u32 addrs_cnt)
 {
 	struct modules_array arr = {};
 	u32 i, err = 0;
@@ -2969,7 +3003,8 @@ static int addrs_check_error_injection_list(unsigned long *addrs, u32 cnt)
 	return 0;
 }
 
-int bpf_kprobe_multi_link_attach(const union bpf_attr *attr, struct bpf_prog *prog)
+int bpf_kprobe_multi_link_attach(const union bpf_attr *attr,
+				 struct bpf_prog *prog)
 {
 	struct bpf_kprobe_multi_link *link = NULL;
 	struct bpf_link_primer link_primer;
@@ -3048,7 +3083,8 @@ int bpf_kprobe_multi_link_attach(const union bpf_attr *attr, struct bpf_prog *pr
 			goto error;
 	}
 
-	if (prog->kprobe_override && addrs_check_error_injection_list(addrs, cnt)) {
+	if (prog->kprobe_override &&
+	    addrs_check_error_injection_list(addrs, cnt)) {
 		err = -EINVAL;
 		goto error;
 	}
@@ -3083,10 +3119,8 @@ int bpf_kprobe_multi_link_attach(const union bpf_attr *attr, struct bpf_prog *pr
 		 * find cookie based on the address in bpf_get_attach_cookie
 		 * helper.
 		 */
-		sort_r(addrs, cnt, sizeof(*addrs),
-		       bpf_kprobe_multi_cookie_cmp,
-		       bpf_kprobe_multi_cookie_swap,
-		       link);
+		sort_r(addrs, cnt, sizeof(*addrs), bpf_kprobe_multi_cookie_cmp,
+		       bpf_kprobe_multi_cookie_swap, link);
 	}
 
 	err = get_modules_for_addrs(&link->mods, addrs, cnt);
@@ -3112,7 +3146,8 @@ error:
 	return err;
 }
 #else /* !CONFIG_FPROBE */
-int bpf_kprobe_multi_link_attach(const union bpf_attr *attr, struct bpf_prog *prog)
+int bpf_kprobe_multi_link_attach(const union bpf_attr *attr,
+				 struct bpf_prog *prog)
 {
 	return -EOPNOTSUPP;
 }
@@ -3168,7 +3203,8 @@ static void bpf_uprobe_multi_link_release(struct bpf_link *link)
 	struct bpf_uprobe_multi_link *umulti_link;
 
 	umulti_link = container_of(link, struct bpf_uprobe_multi_link, link);
-	bpf_uprobe_unregister(&umulti_link->path, umulti_link->uprobes, umulti_link->cnt);
+	bpf_uprobe_unregister(&umulti_link->path, umulti_link->uprobes,
+			      umulti_link->cnt);
 }
 
 static void bpf_uprobe_multi_link_dealloc(struct bpf_link *link)
@@ -3186,7 +3222,8 @@ static void bpf_uprobe_multi_link_dealloc(struct bpf_link *link)
 static int bpf_uprobe_multi_link_fill_link_info(const struct bpf_link *link,
 						struct bpf_link_info *info)
 {
-	u64 __user *uref_ctr_offsets = u64_to_user_ptr(info->uprobe_multi.ref_ctr_offsets);
+	u64 __user *uref_ctr_offsets =
+		u64_to_user_ptr(info->uprobe_multi.ref_ctr_offsets);
 	u64 __user *ucookies = u64_to_user_ptr(info->uprobe_multi.cookies);
 	u64 __user *uoffsets = u64_to_user_ptr(info->uprobe_multi.offsets);
 	u64 __user *upath = u64_to_user_ptr(info->uprobe_multi.path);
@@ -3205,8 +3242,11 @@ static int bpf_uprobe_multi_link_fill_link_info(const struct bpf_link *link,
 	umulti_link = container_of(link, struct bpf_uprobe_multi_link, link);
 	info->uprobe_multi.count = umulti_link->cnt;
 	info->uprobe_multi.flags = umulti_link->flags;
-	info->uprobe_multi.pid = umulti_link->task ?
-				 task_pid_nr_ns(umulti_link->task, task_active_pid_ns(current)) : 0;
+	info->uprobe_multi.pid =
+		umulti_link->task ?
+			task_pid_nr_ns(umulti_link->task,
+				       task_active_pid_ns(current)) :
+			0;
 
 	if (upath) {
 		char *p, *buf;
@@ -3242,7 +3282,8 @@ static int bpf_uprobe_multi_link_fill_link_info(const struct bpf_link *link,
 		    put_user(umulti_link->uprobes[i].offset, uoffsets + i))
 			return -EFAULT;
 		if (uref_ctr_offsets &&
-		    put_user(umulti_link->uprobes[i].ref_ctr_offset, uref_ctr_offsets + i))
+		    put_user(umulti_link->uprobes[i].ref_ctr_offset,
+			     uref_ctr_offsets + i))
 			return -EFAULT;
 		if (ucookies &&
 		    put_user(umulti_link->uprobes[i].cookie, ucookies + i))
@@ -3258,8 +3299,7 @@ static const struct bpf_link_ops bpf_uprobe_multi_link_lops = {
 	.fill_link_info = bpf_uprobe_multi_link_fill_link_info,
 };
 
-static int uprobe_prog_run(struct bpf_uprobe *uprobe,
-			   unsigned long entry_ip,
+static int uprobe_prog_run(struct bpf_uprobe *uprobe, unsigned long entry_ip,
 			   struct pt_regs *regs)
 {
 	struct bpf_uprobe_multi_link *link = uprobe->link;
@@ -3295,9 +3335,9 @@ static int uprobe_prog_run(struct bpf_uprobe *uprobe,
 	return err;
 }
 
-static bool
-uprobe_multi_link_filter(struct uprobe_consumer *con, enum uprobe_filter_ctx ctx,
-			 struct mm_struct *mm)
+static bool uprobe_multi_link_filter(struct uprobe_consumer *con,
+				     enum uprobe_filter_ctx ctx,
+				     struct mm_struct *mm)
 {
 	struct bpf_uprobe *uprobe;
 
@@ -3305,8 +3345,8 @@ uprobe_multi_link_filter(struct uprobe_consumer *con, enum uprobe_filter_ctx ctx
 	return uprobe->link->task->mm == mm;
 }
 
-static int
-uprobe_multi_link_handler(struct uprobe_consumer *con, struct pt_regs *regs)
+static int uprobe_multi_link_handler(struct uprobe_consumer *con,
+				     struct pt_regs *regs)
 {
 	struct bpf_uprobe *uprobe;
 
@@ -3314,8 +3354,9 @@ uprobe_multi_link_handler(struct uprobe_consumer *con, struct pt_regs *regs)
 	return uprobe_prog_run(uprobe, instruction_pointer(regs), regs);
 }
 
-static int
-uprobe_multi_link_ret_handler(struct uprobe_consumer *con, unsigned long func, struct pt_regs *regs)
+static int uprobe_multi_link_ret_handler(struct uprobe_consumer *con,
+					 unsigned long func,
+					 struct pt_regs *regs)
 {
 	struct bpf_uprobe *uprobe;
 
@@ -3327,7 +3368,8 @@ static u64 bpf_uprobe_multi_entry_ip(struct bpf_run_ctx *ctx)
 {
 	struct bpf_uprobe_multi_run_ctx *run_ctx;
 
-	run_ctx = container_of(current->bpf_ctx, struct bpf_uprobe_multi_run_ctx, run_ctx);
+	run_ctx = container_of(current->bpf_ctx,
+			       struct bpf_uprobe_multi_run_ctx, run_ctx);
 	return run_ctx->entry_ip;
 }
 
@@ -3335,11 +3377,13 @@ static u64 bpf_uprobe_multi_cookie(struct bpf_run_ctx *ctx)
 {
 	struct bpf_uprobe_multi_run_ctx *run_ctx;
 
-	run_ctx = container_of(current->bpf_ctx, struct bpf_uprobe_multi_run_ctx, run_ctx);
+	run_ctx = container_of(current->bpf_ctx,
+			       struct bpf_uprobe_multi_run_ctx, run_ctx);
 	return run_ctx->uprobe->cookie;
 }
 
-int bpf_uprobe_multi_link_attach(const union bpf_attr *attr, struct bpf_prog *prog)
+int bpf_uprobe_multi_link_attach(const union bpf_attr *attr,
+				 struct bpf_prog *prog)
 {
 	struct bpf_uprobe_multi_link *link = NULL;
 	unsigned long __user *uref_ctr_offsets;
@@ -3379,7 +3423,8 @@ int bpf_uprobe_multi_link_attach(const union bpf_attr *attr, struct bpf_prog *pr
 	if (cnt > MAX_UPROBE_MULTI_CNT)
 		return -E2BIG;
 
-	uref_ctr_offsets = u64_to_user_ptr(attr->link_create.uprobe_multi.ref_ctr_offsets);
+	uref_ctr_offsets =
+		u64_to_user_ptr(attr->link_create.uprobe_multi.ref_ctr_offsets);
 	ucookies = u64_to_user_ptr(attr->link_create.uprobe_multi.cookies);
 
 	name = strndup_user(upath, PATH_MAX);
@@ -3426,7 +3471,8 @@ int bpf_uprobe_multi_link_attach(const union bpf_attr *attr, struct bpf_prog *pr
 			err = -EINVAL;
 			goto error_free;
 		}
-		if (uref_ctr_offsets && __get_user(uprobes[i].ref_ctr_offset, uref_ctr_offsets + i)) {
+		if (uref_ctr_offsets && __get_user(uprobes[i].ref_ctr_offset,
+						   uref_ctr_offsets + i)) {
 			err = -EFAULT;
 			goto error_free;
 		}
@@ -3438,7 +3484,8 @@ int bpf_uprobe_multi_link_attach(const union bpf_attr *attr, struct bpf_prog *pr
 		uprobes[i].link = link;
 
 		if (flags & BPF_F_UPROBE_MULTI_RETURN)
-			uprobes[i].consumer.ret_handler = uprobe_multi_link_ret_handler;
+			uprobes[i].consumer.ret_handler =
+				uprobe_multi_link_ret_handler;
 		else
 			uprobes[i].consumer.handler = uprobe_multi_link_handler;
 
@@ -3482,7 +3529,8 @@ error_path_put:
 	return err;
 }
 #else /* !CONFIG_UPROBES */
-int bpf_uprobe_multi_link_attach(const union bpf_attr *attr, struct bpf_prog *prog)
+int bpf_uprobe_multi_link_attach(const union bpf_attr *attr,
+				 struct bpf_prog *prog)
 {
 	return -EOPNOTSUPP;
 }
