@@ -186,6 +186,21 @@ static __always_inline bool check_region_inline(const void *addr,
 bool kasan_check_range(const void *addr, size_t size, bool write,
 					unsigned long ret_ip)
 {
+
+	if (preempt_count() == 0
+	    && in_task()
+			&& !is_idle_task(current)
+			&& !current->non_block_count
+			&& !irqs_disabled()
+			&& (rcu_preempt_depth() << MIGHT_RESCHED_RCU_SHIFT) == 0 // from resched_offsets_ok(offsets)
+			&& get_current_state() == TASK_RUNNING // ignoring || !current->task_state_change
+			&& system_state == SYSTEM_RUNNING // wait until we've booted
+			) {
+
+			might_sleep();
+			schedule();
+	}
+
 	return check_region_inline(addr, size, write, ret_ip);
 }
 
