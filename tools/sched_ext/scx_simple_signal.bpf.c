@@ -53,33 +53,41 @@ struct task_ctx {
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(key, pid_t);
-	__uint(value, struct task_ctx);
+	__type(key, pid_t);
+	__type(value, struct task_ctx);
 	__uint(max_entries, MAX_THREADS);
 } task_ctx_map SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(key, u32);
-	__uint(value, struct sched_req);
+	__type(key, u32);
+	__type(value, struct sched_req);
 	__uint(max_entries, 10);
 } sched_req_map SEC(".maps");
 
-static int insert_sched_req_map() 
+static int insert_task_ctx_map(pid_t pid, u32 eid, bool enqueued)
 {
+	struct task_ctx ctx;
+	ctx.id = eid;
+	ctx.enqueued = enqueued;
+	if (bpf_map_update_elem(&task_ctx_map, &pid, &ctx, BPF_NOEXIST) < 0) {
+		bpf_printk("[insert_task_ctx_map] task context alredy exists");
+	}
+	return 0;
 }
 
 static long receive_req(struct bpf_dynptr *dynptr, void *context)
 {
 	struct sched_req req;
-	int *task_ctx_map;
 
 	if (bpf_dynptr_read(&req, sizeof(req), dynptr, 0, 0) < 0) {
 		bpf_printk("[receive_req] error reading dynptr data");
 		return 0;
 	}
 
-	insert_sched_req_map();
+	if (bpf_map_update_elem(&sched_req_map, &req.pid, &req, BPF_ANY) < 0) {
+		bpf_printk("[receive_req] fail to add sched request");
+	}
 
 	return 0;
 }
@@ -99,11 +107,6 @@ static inline bool is_sched_ext(const struct task_struct *p)
 	return policy == SCHED_EXT;
 }
 
-static int insert_task_ctx_map()
-{
-
-}
-
 s32 BPF_STRUCT_OPS(simple_signal_init_task, struct task_struct *p,
 		   struct scx_init_task_args *args)
 {
@@ -117,18 +120,24 @@ s32 BPF_STRUCT_OPS(simple_signal_init_task, struct task_struct *p,
 
 static u32 get_executor_id(const struct task_struct *p) {
 	char comm[TASK_COMM_LEN];
-	u16 id;
+	u32 eid;
 	long status;
 
 	status = bpf_probe_read_kernel(&comm, sizeof(comm), p->comm);
+	if (status) {
+		bpf_printk("[get_executor_id] error reading p->comm");
+		return 0;
+	}
+
 	// comm: `syz-executor.X`
-	id = (u32)comm[13];
-	return id;
+	eid = (u32)comm[13];
+	return eid;
 }
 
 void BPF_STRUCT_OPS(simple_signal_enqueue, struct task_struct *p, u64 enq_flags)
 {
 	struct event *e;
+	u32 eid;
 	// bpf_printk("[enqueue] pid: %d\n", p->pid);
 
 	if (is_sched_ext(p) && (bpf_user_ringbuf_drain(&user_ringbuf, receive_req, NULL, 0) > 0)) {
@@ -142,7 +151,8 @@ void BPF_STRUCT_OPS(simple_signal_enqueue, struct task_struct *p, u64 enq_flags)
 	}
 
 	if (is_sched_ext(p)) {
-		insert_task_ctx_map();
+		eid = get_executor_id(p);
+		insert_task_ctx_map(p->pid, eid, false);
 		// Start scheduling if condition is satisfied
 	}
 

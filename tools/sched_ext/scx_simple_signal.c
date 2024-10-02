@@ -15,8 +15,8 @@
 #include <sys/mman.h>
 #include <pthread.h>
 #include <scx/common.h>
-#include "scx_atropos.h"
-#include "scx_atropos.bpf.skel.h"
+#include "scx_simple_signal.h"
+#include "scx_simple_signal.bpf.skel.h"
 
 #define SCHED_SHM "/sched_shared_memory"
 #define SHM_SIZE 1024
@@ -104,7 +104,7 @@ static int handle_kernel_reply(void *ctx, void *data, size_t data_sz)
 
 int main(int argc, char **argv)
 {
-	struct scx_atropos *skel;
+	struct scx_simple_signal *skel;
 	struct bpf_link *link;
 	struct ring_buffer *rb = NULL;
 	struct user_ring_buffer *user_rb = NULL;
@@ -115,11 +115,11 @@ int main(int argc, char **argv)
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 
-	skel = scx_atropos__open();
+	skel = scx_simple_signal__open();
 	SCX_BUG_ON(!skel, "Failed to open skel");
 
-	SCX_OPS_LOAD(skel, atropos_ops, scx_atropos, uei);
-	link = SCX_OPS_ATTACH(skel, atropos_ops);
+	SCX_OPS_LOAD(skel, simple_signal_ops, scx_simple_signal, uei);
+	link = SCX_OPS_ATTACH(skel, simple_signal_ops);
 
 	setup_shm();
 
@@ -177,6 +177,6 @@ cleanup:
 
 	bpf_link__destroy(link);
 	UEI_REPORT(skel, uei);
-	scx_atropos__destroy(skel);
+	scx_simple_signal__destroy(skel);
 	return 0;
 }
