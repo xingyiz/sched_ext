@@ -24,8 +24,8 @@ const char help_fmt[] =
 	"  -s            Enter seed for the RNG. Default: 0xdeadbeef.\n"
 	"  -d            Enter depth of bug to search for. Default: 3.\n"
 	"  -h            Display this help and exit\n"
-	"  -r            Use random walk instead of PCT. 1 for random walk, 2 for random walk 2\n"
-	"  -u            Use udelay. 0 for no, 1 for yes. Default: 1.\n";
+	"  -r            (PCT disabled) 1 for random priority walk, 2 for random walk 2, Default: 2. \n"
+	"  -u            Use udelay. 0 for no, 1 for yes. (Deprecated) Default: 0.\n";
 
 static volatile int exit_req;
 

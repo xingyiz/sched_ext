@@ -139,17 +139,22 @@ int main(int argc, char **argv)
 	}
 
 	while (!exit_req && !UEI_EXITED(skel, uei)) {
+		fprintf(stderr, "Acquiring SHM mutex...\n");
 		pthread_mutex_lock(&shm_ptr->mutex);
 
+		fprintf(stderr, "Waiting for signal from executor\n");
 		// wait for the request from executor
 		while (!shm_ptr->available) {
 			pthread_cond_wait(&shm_ptr->cond, &shm_ptr->mutex);
+			fprintf(stderr, "woke\n");
 		}
+		fprintf(stderr, "Received signal from executor!\n");
 
 		if (send_sched_req(user_rb) < 0) {
 			fprintf(stderr, "Failed to send request to user_ring_buffer\n");
 			break;
 		}
+		fprintf(stderr, "Sent signal to EBPF prog via ringbuffer\n");
 
 		// keep waiting
 		err = ring_buffer__poll(rb, -1);
@@ -165,6 +170,7 @@ int main(int argc, char **argv)
 		shm_ptr->available = 0;
 
 		pthread_mutex_unlock(&shm_ptr->mutex);
+		fprintf(stderr, "Relinquished SHM mutex...\n");
 	}
 
 cleanup:

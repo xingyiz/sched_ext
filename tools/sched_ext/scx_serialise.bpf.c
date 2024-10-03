@@ -43,7 +43,7 @@ static void stat_inc(u32 idx)
  * how many threads you expect the program-under-test to create.
  */
 #define MAX_THREADS 50
-const volatile u32 use_udelay = 1;
+const volatile u32 use_udelay = 0;
 
 /* Debugging macros */
 const volatile u32 debug = 1;
@@ -309,7 +309,7 @@ static inline bool is_sched_ext(const struct task_struct *p)
  * @num_events: the number of enqueue()s that have occurred
  */
 const volatile u32 depth = 3, seed = 0xdeadbeef;
-const volatile int use_pct = 1;
+const volatile int use_pct = 0;
 u32 iterations, initial_max_num_events, task_count, strata, max_num_events,
 	num_events;
 
@@ -486,14 +486,15 @@ static void choose_change_points(struct xorshift32_state *state)
  * C program based on user-defined parameters.
  */
 const volatile int use_random_walk = 0;
-const volatile int use_random_walk_2 = 0;
+const volatile int use_random_walk_2 = 1;
 
 /*
  * Assign the priority for a thread based on a completely random number.
  */
 static inline s32 assign_rw_priority(pid_t pid)
 {
-	s32 priority = bpf_get_prandom_u32() % MAX_THREADS;
+	s32 priority = xorshift32(&rng_state) % 2147483647;
+	dbg("prio new %d", priority);
 	return priority;
 }
 
@@ -935,10 +936,10 @@ s32 BPF_STRUCT_OPS_SLEEPABLE(serialise_init)
 		return status;
 	}
 
+	rng_state.a = seed;
 	/* Initialise PCT variables */
 	if (use_pct) {
 		dbg("[init] depth: %d, seed: %d\n", depth, seed);
-		rng_state.a = seed;
 		iterations = 0;
 		max_num_events = 0;
 		strata = 0;
@@ -982,61 +983,3 @@ struct sched_ext_ops serialise_ops = {
 	.name = "serialise",
 };
 
-/* =================================
- * Hooks
- * ================================= */
-
-#define TRACEPOINT_HOOK(subsystem, fn_name, invoke_num, args...)              \
-	u32 fn_name##_counter = 0;                                            \
-	u32 fn_name##_next_invoke = 10;                                       \
-	SEC("tp/" #subsystem "/" #fn_name)                                    \
-	int fn_name##_hook(args)                                              \
-	{                                                                     \
-		struct task_struct *p =                                       \
-			(struct task_struct *)bpf_get_current_task();         \
-		if (!is_sched_ext(p))                                         \
-			return 0;                                             \
-		__sync_fetch_and_add(&fn_name##_counter, 1);                  \
-		if (fn_name##_counter >= fn_name##_next_invoke) {             \
-			bpf_schedule();                                       \
-			dbg("[hook] " #fn_name ": bpf schedule called: %d\n", \
-			    fn_name##_next_invoke);                           \
-			fn_name##_counter = 0;                                \
-			fn_name##_next_invoke =                               \
-				bpf_get_prandom_u32() % invoke_num + 10;      \
-		}                                                             \
-		return 0;                                                     \
-	}
-
-/*
- * Udelay is called too often to trigger a reschedule every time it is called.
- * Instead, we trigger a reschedule every few random calls to udelay.
- */
-
-u32 udelay_schedule_counter = 0;
-u32 udelay_next_invoke = 10;
-SEC("kprobe/__udelay")
-int BPF_KPROBE(udelay_probe)
-{
-	if (!use_udelay)
-		return 0;
-
-	struct task_struct *p = (struct task_struct *)bpf_get_current_task();
-	if (!is_sched_ext(p))
-		return 0;
-
-	__sync_fetch_and_add(&udelay_schedule_counter, 1);
-	if (udelay_schedule_counter >= udelay_next_invoke) {
-		bpf_schedule();
-		dbg("[udelay_probe] bpf schedule called: %d\n",
-		    udelay_next_invoke);
-		udelay_schedule_counter = 0;
-		udelay_next_invoke = bpf_get_prandom_u32() % 300 + 10;
-	}
-	return 0;
-}
-
-// TRACEPOINT_HOOK(kmem, kmalloc, 30)
-// TRACEPOINT_HOOK(kmem, kfree, 30)
-// TRACEPOINT_HOOK(lock, lock_acquire, 1000)
-// TRACEPOINT_HOOK(lock, lock_release, 1010)
