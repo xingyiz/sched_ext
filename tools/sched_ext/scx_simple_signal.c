@@ -61,6 +61,8 @@ static void setup_shm()
 		exit(1);
 	}
 
+	memset(shm_ptr, 0, SHM_SIZE);
+
 	pthread_mutexattr_t mutex_attr;
 	pthread_mutexattr_init(&mutex_attr);
 	pthread_mutexattr_setpshared(&mutex_attr, PTHREAD_PROCESS_SHARED);
