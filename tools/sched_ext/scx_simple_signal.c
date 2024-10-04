@@ -61,6 +61,7 @@ static void setup_shm()
 		exit(1);
 	}
 
+	fprintf(stderr, "MEMSET\n");
 	memset(shm_ptr, 0, SHM_SIZE);
 
 	pthread_mutexattr_t mutex_attr;
@@ -123,6 +124,7 @@ int main(int argc, char **argv)
 	SCX_OPS_LOAD(skel, simple_signal_ops, scx_simple_signal, uei);
 	link = SCX_OPS_ATTACH(skel, simple_signal_ops);
 
+	fprintf(stderr, "setting up shm\n");
 	setup_shm();
 
 	rb = ring_buffer__new(bpf_map__fd(skel->maps.kernel_ringbuf),
@@ -154,6 +156,8 @@ int main(int argc, char **argv)
 
 		if (send_sched_req(user_rb) < 0) {
 			fprintf(stderr, "Failed to send request to user_ring_buffer\n");
+			pthread_mutex_unlock(&shm_ptr->mutex);
+			fprintf(stderr, "Relinquished SHM mutex...\n");
 			break;
 		}
 		fprintf(stderr, "Sent signal to EBPF prog via ringbuffer\n");
@@ -162,10 +166,14 @@ int main(int argc, char **argv)
 		err = ring_buffer__poll(rb, -1);
 		if (err == -EINTR) {
 			err = 0;
+			pthread_mutex_unlock(&shm_ptr->mutex);
+			fprintf(stderr, "Relinquished SHM mutex...\n");
 			break;
 		}
 		if (err < 0) {
 			printf("Error polling ring buffer: %d\n", err);
+			pthread_mutex_unlock(&shm_ptr->mutex);
+			fprintf(stderr, "Relinquished SHM mutex...\n");
 			break;
 		}
 
