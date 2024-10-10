@@ -12,4 +12,8 @@ struct sched_req {
     int num_call;
 };
 
+struct xorshift32_state {
+       u32 a;
+};
+
 #endif /* __BOOTSTRAP_H */

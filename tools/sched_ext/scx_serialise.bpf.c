@@ -9,10 +9,32 @@
 #include <scx/common.bpf.h>
 #include <string.h>
 #include <limits.h>
+#include "scx_simple_signal.h"
 
 char _license[] SEC("license") = "GPL";
 
 UEI_DEFINE(uei);
+
+/* Communication channels to/from user-space */
+struct {
+	__uint(type, BPF_MAP_TYPE_USER_RINGBUF);
+	__uint(max_entries, 256 * 1024);
+} user_ringbuf SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, 256 * 1024);
+} kernel_ringbuf SEC(".maps");
+
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, u32);
+	__type(value, struct sched_req);
+	__uint(max_entries, 10);
+} sched_req_map SEC(".maps");
+
+
 
 /*
  * Dispatch statistics. This map is used to keep track of the number of times
@@ -30,6 +52,22 @@ static void stat_inc(u32 idx)
 	u64 *cnt_p = bpf_map_lookup_elem(&stats, &idx);
 	if (cnt_p)
 		(*cnt_p)++;
+}
+
+static long receive_req(struct bpf_dynptr *dynptr, void *context)
+{
+	struct sched_req req;
+
+	if (bpf_dynptr_read(&req, sizeof(req), dynptr, 0, 0) < 0) {
+		bpf_printk("[receive_req] error reading dynptr data");
+		return 0;
+	}
+
+	if (bpf_map_update_elem(&sched_req_map, &req.pid, &req, BPF_ANY) < 0) {
+		bpf_printk("[receive_req] fail to add sched request");
+	}
+
+	return 0;
 }
 
 /* The number used in the Linux kernel for the sched_ext scheduling policy */
@@ -314,9 +352,7 @@ u32 iterations, initial_max_num_events, task_count, strata, max_num_events,
 	num_events;
 
 /* xorshift random generator */
-struct xorshift32_state {
-	u32 a;
-} rng_state;
+struct xorshift32_state rng_state;
 
 /* The state must be initialized to non-zero */
 u32 xorshift32(struct xorshift32_state *state)
