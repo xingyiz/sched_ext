@@ -66,7 +66,7 @@ struct {
  */
 struct task_ctx {
 	s32 priority;
-	u32 id; // id of executor
+	u32 eid; // id of executor
 	bool enqueued;
 	struct bpf_spin_lock lock;
 };
@@ -190,7 +190,7 @@ static int tctx_map_insert(pid_t new_pid, s32 modify_prio, bool enqueued,
 	/* Update priority and enqueued status */
 	bpf_spin_lock(&tctx->lock);
 	if (modify_prio)
-		tctx->priority = modify_prio;
+	tctx->priority = modify_prio;
 	tctx->enqueued = enqueued;
 	bpf_spin_unlock(&tctx->lock);
 

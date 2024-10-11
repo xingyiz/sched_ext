@@ -144,6 +144,19 @@ static void read_stats(struct scx_serialise *skel, __u64 *stats)
 	}
 }
 
+void* stats_thread_loop(void* args) {
+	struct scx_serialise* skel = (struct scx_serialise*) args;
+
+	while (!exit_req && !UEI_EXITED(skel, uei)) {
+		__u64 stats[2];
+		read_stats(skel, stats);
+		printf("main=%llu thread=%llu\n", stats[0], stats[1]);
+		fflush(stdout);
+		sleep(1);
+	}
+	return NULL;
+}
+
 int main(int argc, char **argv)
 {
 	struct scx_serialise *skel;
@@ -239,13 +252,13 @@ int main(int argc, char **argv)
 	}
 
 
-	// while (!exit_req && !UEI_EXITED(skel, uei)) {
-	// 	__u64 stats[2];
-	// 	read_stats(skel, stats);
-	// 	printf("main=%llu thread=%llu\n", stats[0], stats[1]);
-	// 	fflush(stdout);
-	// 	sleep(1);
-	// }
+  pthread_t stats_thread;
+
+  // Create the thread
+  if (pthread_create(&stats_thread, NULL, stats_thread_loop, (void *)skel) != 0) {
+      perror("Failed to create thread");
+      return 1;
+  }
 
 	
 	while (!exit_req && !UEI_EXITED(skel, uei)) {
