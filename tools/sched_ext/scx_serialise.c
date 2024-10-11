@@ -146,17 +146,43 @@ int main(int argc, char **argv)
 {
 	struct scx_serialise *skel;
 	struct bpf_link *link;
-	__u32 opt;
-
-	srand(time(NULL));
+	struct ring_buffer *rb = NULL;
+	struct user_ring_buffer *user_rb = NULL;
+	int err;
 
 	signal(SIGINT, sigint_handler);
 	signal(SIGTERM, sigint_handler);
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 
+	srand(time(NULL));
+
 	skel = scx_serialise__open();
 	SCX_BUG_ON(!skel, "Failed to open skel");
+
+	SCX_OPS_LOAD(skel, serialise_ops, scx_serialise, uei);
+	link = SCX_OPS_ATTACH(skel, serialise_ops);
+
+	fprintf(stderr, "setting up shm\n");
+	setup_shm();
+
+	rb = ring_buffer__new(bpf_map__fd(skel->maps.kernel_ringbuf),
+			      handle_kernel_reply, NULL, NULL);
+	if (!rb) {
+		err = -1;
+		fprintf(stderr, "Failed to create ring buffer\n");
+		goto cleanup;
+	}
+
+	user_rb = user_ring_buffer__new(bpf_map__fd(skel->maps.user_ringbuf),
+					NULL);
+	if (!user_rb) {
+		fprintf(stderr, "Failed to create user_ring_buffer\n");
+		goto cleanup;
+	}
+
+	__u32 opt;
+
 
 	while ((opt = getopt(argc, argv, "s:d:hr:u:")) != -1) {
 		unsigned long v;
@@ -207,35 +233,67 @@ int main(int argc, char **argv)
 		}
 	}
 
-	SCX_OPS_LOAD(skel, serialise_ops, scx_serialise, uei);
-	link = SCX_OPS_ATTACH(skel, serialise_ops);
 
+	// while (!exit_req && !UEI_EXITED(skel, uei)) {
+	// 	__u64 stats[2];
+	// 	read_stats(skel, stats);
+	// 	printf("main=%llu thread=%llu\n", stats[0], stats[1]);
+	// 	fflush(stdout);
+	// 	sleep(1);
+	// }
+
+	
 	while (!exit_req && !UEI_EXITED(skel, uei)) {
-		__u64 stats[2];
-		read_stats(skel, stats);
-		printf("main=%llu thread=%llu\n", stats[0], stats[1]);
-		fflush(stdout);
-		sleep(1);
+		fprintf(stderr, "Acquiring SHM mutex...\n");
+		pthread_mutex_lock(&shm_ptr->mutex);
+
+		fprintf(stderr, "Waiting for signal from executor\n");
+		// wait for the request from executor
+		while (!shm_ptr->available) {
+			pthread_cond_wait(&shm_ptr->cond, &shm_ptr->mutex);
+			fprintf(stderr, "woke\n");
+		}
+		fprintf(stderr, "Received signal from executor!\n");
+
+		if (send_sched_req(user_rb) < 0) {
+			fprintf(stderr, "Failed to send request to user_ring_buffer\n");
+			pthread_mutex_unlock(&shm_ptr->mutex);
+			fprintf(stderr, "Relinquished SHM mutex...\n");
+			break;
+		}
+		fprintf(stderr, "Sent signal to EBPF prog via ringbuffer\n");
+
+		// keep waiting
+		err = ring_buffer__poll(rb, -1);
+		if (err == -EINTR) {
+			err = 0;
+			pthread_mutex_unlock(&shm_ptr->mutex);
+			fprintf(stderr, "Relinquished SHM mutex...\n");
+			break;
+		}
+		if (err < 0) {
+			printf("Error polling ring buffer: %d\n", err);
+			pthread_mutex_unlock(&shm_ptr->mutex);
+			fprintf(stderr, "Relinquished SHM mutex...\n");
+			break;
+		}
+
+		shm_ptr->available = 0;
+
+		pthread_mutex_unlock(&shm_ptr->mutex);
+		fprintf(stderr, "Relinquished SHM mutex...\n");
 	}
 
-	bpf_link__destroy(link);
-	UEI_REPORT(skel, uei);
-	scx_serialise__destroy(skel);
-	return 0;
+	cleanup:
+		// /* Clean up */
+		munmap(shm_ptr, SHM_SIZE);
+	  close(schedShmFd);
+
+		ring_buffer__free(rb);
+		user_ring_buffer__free(user_rb);
+
+		bpf_link__destroy(link);
+		UEI_REPORT(skel, uei);
+		scx_serialise__destroy(skel);
+		return 0;
 }
-
-
-
-// cleanup:
-// 	// /* Clean up */
-// 	munmap(shm_ptr, SHM_SIZE);
-//     close(schedShmFd);
-
-// 	ring_buffer__free(rb);
-// 	user_ring_buffer__free(user_rb);
-
-// 	bpf_link__destroy(link);
-// 	UEI_REPORT(skel, uei);
-// 	scx_serialise__destroy(skel);
-// 	return 0;
-// }
