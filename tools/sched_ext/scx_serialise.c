@@ -36,7 +36,7 @@ typedef struct {
 	pthread_cond_t cond;
 	int available;
 	int num_call;
-	u32 rng_state;
+	u32 rng_seed;
 	unsigned long long pid;
 } sched_shm;
 
@@ -110,7 +110,7 @@ static int send_sched_req(struct user_ring_buffer *ringbuf)
 
 	req->num_call = shm_ptr->num_call;
 	req->pid = shm_ptr->pid;
-	req->rng_seed = 999;
+	req->rng_seed = shm_ptr->rng_seed;
 	user_ring_buffer__submit(ringbuf, req);
 	printf("[send_sched_req] sched request has been sent\n");
 	return 0;
@@ -210,12 +210,15 @@ int main(int argc, char **argv)
 				printf("use random walk: %lu\n", v);
 				skel->rodata->use_pct = 0;
 
-				if (v == 1)
+				if (v == 1) {
+					skel->rodata->use_random_priority_walk = 1;
+					skel->rodata->use_random_walk = 0;
+				} else if (v == 2) {
+					skel->rodata->use_random_priority_walk = 0;
 					skel->rodata->use_random_walk = 1;
-				else if (v == 2)
-					skel->rodata->use_random_walk_2 = 1;
-				else
+				} else {
 					SCX_BUG_ON(1, "Invalid option for -r");
+				}
 			}
 			break;
 		case 'u':
