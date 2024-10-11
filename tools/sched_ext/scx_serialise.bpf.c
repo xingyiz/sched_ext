@@ -15,6 +15,15 @@ char _license[] SEC("license") = "GPL";
 
 UEI_DEFINE(uei);
 
+/*
+ * The maximum number of threads that is supported by the scheduler.
+ *
+ * This value defines the size of the map used to store the priorities 
+ * and enqueued status of each thread. Adjust this value according to 
+ * how many threads you expect the program-under-test to create.
+ */
+#define MAX_THREADS 50
+
 /* Communication channels to/from user-space */
 struct {
 	__uint(type, BPF_MAP_TYPE_USER_RINGBUF);
@@ -35,6 +44,43 @@ struct {
 } sched_req_map SEC(".maps");
 
 
+/*
+ * Task context that is used to store the priority and enqueued status of
+ * each task. These variables are protected by a spin lock to sieve out
+ * concurrent updates.
+ */
+
+struct task_ctx {
+	s32 priority;
+	u32 id; // id of executor
+	bool enqueued;
+	struct bpf_spin_lock lock;
+};
+
+/*
+ * The map used to store the task context of each task. The key is the pid
+ * of the task and the value is the task context.
+ * 
+ * This map is iterated in dispatch() to determine the total number of runnable
+ * tasks, the number of enqueued tasks, and the highest priority task.
+ */
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, pid_t); /* pid of the task */
+	__type(value, struct task_ctx);
+	__uint(max_entries, MAX_THREADS);
+} task_ctx_map SEC(".maps");
+
+static int insert_task_ctx_map(pid_t pid, u32 eid, bool enqueued)
+{
+	struct task_ctx ctx;
+	ctx.id = eid;
+	ctx.enqueued = enqueued;
+	if (bpf_map_update_elem(&task_ctx_map, &pid, &ctx, BPF_NOEXIST) < 0) {
+		bpf_printk("[insert_task_ctx_map] task context alredy exists");
+	}
+	return 0;
+}
 
 /*
  * Dispatch statistics. This map is used to keep track of the number of times
@@ -73,14 +119,6 @@ static long receive_req(struct bpf_dynptr *dynptr, void *context)
 /* The number used in the Linux kernel for the sched_ext scheduling policy */
 #define SCHED_EXT 7
 
-/*
- * The maximum number of threads that is supported by the scheduler.
- *
- * This value defines the size of the map used to store the priorities 
- * and enqueued status of each thread. Adjust this value according to 
- * how many threads you expect the program-under-test to create.
- */
-#define MAX_THREADS 50
 const volatile u32 use_udelay = 0;
 
 /* Debugging macros */
@@ -105,31 +143,6 @@ const volatile u32 debug = 1;
  * the dispatch function to dispatch the next highest priority thread.
  */
 // bool yield_flag = false;
-
-/*
- * Task context that is used to store the priority and enqueued status of
- * each task. These variables are protected by a spin lock to sieve out
- * concurrent updates.
- */
-struct task_ctx {
-	s32 priority;
-	bool enqueued;
-	struct bpf_spin_lock lock;
-};
-
-/*
- * The map used to store the task context of each task. The key is the pid
- * of the task and the value is the task context.
- * 
- * This map is iterated in dispatch() to determine the total number of runnable
- * tasks, the number of enqueued tasks, and the highest priority task.
- */
-struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__type(key, pid_t); /* pid of the task */
-	__type(value, struct task_ctx);
-	__uint(max_entries, MAX_THREADS);
-} task_ctx_map SEC(".maps");
 
 /*
  * Insert or update the task context of a task in the task context map. 
@@ -576,6 +589,22 @@ static __u64 update_all_prios(struct bpf_map *map, pid_t *key,
 //     return 0;
 // }
 
+static u32 get_executor_id(const struct task_struct *p) {
+	char comm[TASK_COMM_LEN];
+	u32 eid;
+	long status;
+
+	status = bpf_probe_read_kernel(&comm, sizeof(comm), p->comm);
+	if (status) {
+		bpf_printk("[get_executor_id] error reading p->comm");
+		return 0;
+	}
+
+	// comm: `syz-executor.X`
+	eid = (u32)comm[13];
+	return eid;
+}
+
 /*
  * Task @p becomes ready to run. We update the task's priority and 
  * the task context to indicate that the task is enqueued.
@@ -583,6 +612,25 @@ static __u64 update_all_prios(struct bpf_map *map, pid_t *key,
 void BPF_STRUCT_OPS(serialise_enqueue, struct task_struct *p, u64 enq_flags)
 {
 	pid_t pid = p->pid, tgid = p->tgid;
+	u32 eid;
+	struct event *e;
+
+	if (is_sched_ext(p) && (bpf_user_ringbuf_drain(&user_ringbuf, receive_req, NULL, 0) > 0)) {
+		e = bpf_ringbuf_reserve(&kernel_ringbuf, sizeof(*e), 0);
+		if (e) {
+			e->pid = p->pid;
+			bpf_printk("[bpf_ringbuf_submit] pid: %d\n", p->pid);
+			/* send data to user-space for post-processing */
+			bpf_ringbuf_submit(e, 0);
+		}
+	}
+
+	if (is_sched_ext(p)) {
+		eid = get_executor_id(p);
+		insert_task_ctx_map(p->pid, eid, false);
+		// Start scheduling if condition is satisfied
+	}
+
 	dbg("[enqueue] pid: %d, tgid: %d, enq_flags: %d\n", pid, tgid,
 	    enq_flags);
 
