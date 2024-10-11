@@ -36,6 +36,7 @@ typedef struct {
 	pthread_cond_t cond;
 	int available;
 	int num_call;
+	u32 rng_state;
 	unsigned long long pid;
 } sched_shm;
 
@@ -109,6 +110,7 @@ static int send_sched_req(struct user_ring_buffer *ringbuf)
 
 	req->num_call = shm_ptr->num_call;
 	req->pid = shm_ptr->pid;
+	req->rng_seed = 999;
 	user_ring_buffer__submit(ringbuf, req);
 	printf("[send_sched_req] sched request has been sent\n");
 	return 0;

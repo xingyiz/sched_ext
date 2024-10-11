@@ -24,6 +24,20 @@ UEI_DEFINE(uei);
  */
 #define MAX_THREADS 50
 
+
+/* xorshift random generator */
+struct xorshift32_state rng_state;
+
+/* The state must be initialized to non-zero */
+u32 xorshift32(struct xorshift32_state *state)
+{
+	u32 x = state->a;
+	x ^= x << 13;
+	x ^= x >> 17;
+	x ^= x << 5;
+	return state->a = x;
+}
+
 /* Communication channels to/from user-space */
 struct {
 	__uint(type, BPF_MAP_TYPE_USER_RINGBUF);
@@ -112,6 +126,9 @@ static long receive_req(struct bpf_dynptr *dynptr, void *context)
 	if (bpf_map_update_elem(&sched_req_map, &req.pid, &req, BPF_ANY) < 0) {
 		bpf_printk("[receive_req] fail to add sched request");
 	}
+
+	rng_state.a = req.rng_seed;
+	bpf_printk("[receive_req] rng seed is %d", req.rng_seed);
 
 	return 0;
 }
@@ -255,7 +272,7 @@ static __u64 get_highest_priority(struct bpf_map *map, pid_t *key,
  */
 #define NSEC_PER_SEC 1000000000L
 #define CLOCK_BOOTTIME 7
-#define SCHED_DELAY_SEC 3
+#define SCHED_DELAY_SEC 30
 
 struct heartbeat {
 	struct bpf_timer timer;
@@ -364,18 +381,6 @@ const volatile int use_pct = 0;
 u32 iterations, initial_max_num_events, task_count, strata, max_num_events,
 	num_events;
 
-/* xorshift random generator */
-struct xorshift32_state rng_state;
-
-/* The state must be initialized to non-zero */
-u32 xorshift32(struct xorshift32_state *state)
-{
-	u32 x = state->a;
-	x ^= x << 13;
-	x ^= x >> 17;
-	x ^= x << 5;
-	return state->a = x;
-}
 
 /*
  * Map to store the pre-determined priorities for each thread.
@@ -615,6 +620,7 @@ void BPF_STRUCT_OPS(serialise_enqueue, struct task_struct *p, u64 enq_flags)
 	u32 eid;
 	struct event *e;
 
+	bpf_printk("[bpf_ringbuf_submit] PREDRIAN pid: %d\n", p->pid);
 	if (is_sched_ext(p) && (bpf_user_ringbuf_drain(&user_ringbuf, receive_req, NULL, 0) > 0)) {
 		e = bpf_ringbuf_reserve(&kernel_ringbuf, sizeof(*e), 0);
 		if (e) {

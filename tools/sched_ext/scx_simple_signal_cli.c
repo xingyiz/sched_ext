@@ -29,6 +29,7 @@ typedef struct {
 	pthread_cond_t cond;
 	int available;
 	int num_call;
+	u32 rng_state;
 	unsigned long long pid;
 } sched_shm;
 
@@ -79,6 +80,7 @@ void send_sched_req()
 	shm_ptr->available = 1;
 	shm_ptr->num_call = 1;
 	shm_ptr->pid = 100;
+	shm_ptr->rng_state = 999;
 	
 	pthread_cond_signal(&shm_ptr->cond);
 	debug("[send_sched_req] signaled cond wait\n");
