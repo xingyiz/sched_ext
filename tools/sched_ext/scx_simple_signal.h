@@ -9,7 +9,12 @@ struct event {
 
 struct sched_req {
 	int pid;
-    int num_call;
+  int num_call;
+  u32 rng_seed;
+};
+
+struct xorshift32_state {
+       u32 a;
 };
 
 #endif /* __BOOTSTRAP_H */

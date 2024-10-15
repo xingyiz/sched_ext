@@ -9,10 +9,81 @@
 #include <scx/common.bpf.h>
 #include <string.h>
 #include <limits.h>
+#include "scx_simple_signal.h"
 
 char _license[] SEC("license") = "GPL";
 
 UEI_DEFINE(uei);
+
+/*
+ * The maximum number of threads that is supported by the scheduler.
+ *
+ * This value defines the size of the map used to store the priorities 
+ * and enqueued status of each thread. Adjust this value according to 
+ * how many threads you expect the program-under-test to create.
+ */
+#define MAX_THREADS 50
+
+const volatile u32 seed = 0xdeadbeef;
+
+/* xorshift random generator */
+struct xorshift32_state rng_state;
+
+/* The state must be initialized to non-zero */
+u32 xorshift32(struct xorshift32_state *state)
+{
+	u32 x = state->a;
+	x ^= x << 13;
+	x ^= x >> 17;
+	x ^= x << 5;
+	return state->a = x;
+}
+
+/* Communication channels to/from user-space */
+struct {
+	__uint(type, BPF_MAP_TYPE_USER_RINGBUF);
+	__uint(max_entries, 256 * 1024);
+} user_ringbuf SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, 256 * 1024);
+} kernel_ringbuf SEC(".maps");
+
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, u32);
+	__type(value, struct sched_req);
+	__uint(max_entries, 10);
+} sched_req_map SEC(".maps");
+
+
+/*
+ * Task context that is used to store the priority and enqueued status of
+ * each task. These variables are protected by a spin lock to sieve out
+ * concurrent updates.
+ */
+struct task_ctx {
+	s32 priority;
+	u32 eid; // id of executor
+	bool enqueued;
+	struct bpf_spin_lock lock;
+};
+
+/*
+ * The map used to store the task context of each task. The key is the pid
+ * of the task and the value is the task context.
+ * 
+ * This map is iterated in dispatch() to determine the total number of runnable
+ * tasks, the number of enqueued tasks, and the highest priority task.
+ */
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, pid_t); /* pid of the task */
+	__type(value, struct task_ctx);
+	__uint(max_entries, MAX_THREADS);
+} task_ctx_map SEC(".maps");
 
 /*
  * Dispatch statistics. This map is used to keep track of the number of times
@@ -32,18 +103,29 @@ static void stat_inc(u32 idx)
 		(*cnt_p)++;
 }
 
+static long receive_req(struct bpf_dynptr *dynptr, void *context)
+{
+	struct sched_req req;
+
+	if (bpf_dynptr_read(&req, sizeof(req), dynptr, 0, 0) < 0) {
+		bpf_printk("[receive_req] error reading dynptr data");
+		return 0;
+	}
+
+	if (bpf_map_update_elem(&sched_req_map, &req.pid, &req, BPF_ANY) < 0) {
+		bpf_printk("[receive_req] fail to add sched request");
+	}
+
+	rng_state.a = req.rng_seed;
+	bpf_printk("[receive_req] rng seed is %d", req.rng_seed);
+
+	return 0;
+}
+
 /* The number used in the Linux kernel for the sched_ext scheduling policy */
 #define SCHED_EXT 7
 
-/*
- * The maximum number of threads that is supported by the scheduler.
- *
- * This value defines the size of the map used to store the priorities 
- * and enqueued status of each thread. Adjust this value according to 
- * how many threads you expect the program-under-test to create.
- */
-#define MAX_THREADS 50
-const volatile u32 use_udelay = 1;
+const volatile u32 use_udelay = 0;
 
 /* Debugging macros */
 const volatile u32 debug = 1;
@@ -67,31 +149,6 @@ const volatile u32 debug = 1;
  * the dispatch function to dispatch the next highest priority thread.
  */
 // bool yield_flag = false;
-
-/*
- * Task context that is used to store the priority and enqueued status of
- * each task. These variables are protected by a spin lock to sieve out
- * concurrent updates.
- */
-struct task_ctx {
-	s32 priority;
-	bool enqueued;
-	struct bpf_spin_lock lock;
-};
-
-/*
- * The map used to store the task context of each task. The key is the pid
- * of the task and the value is the task context.
- * 
- * This map is iterated in dispatch() to determine the total number of runnable
- * tasks, the number of enqueued tasks, and the highest priority task.
- */
-struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__type(key, pid_t); /* pid of the task */
-	__type(value, struct task_ctx);
-	__uint(max_entries, MAX_THREADS);
-} task_ctx_map SEC(".maps");
 
 /*
  * Insert or update the task context of a task in the task context map. 
@@ -133,7 +190,7 @@ static int tctx_map_insert(pid_t new_pid, s32 modify_prio, bool enqueued,
 	/* Update priority and enqueued status */
 	bpf_spin_lock(&tctx->lock);
 	if (modify_prio)
-		tctx->priority = modify_prio;
+	tctx->priority = modify_prio;
 	tctx->enqueued = enqueued;
 	bpf_spin_unlock(&tctx->lock);
 
@@ -204,7 +261,7 @@ static __u64 get_highest_priority(struct bpf_map *map, pid_t *key,
  */
 #define NSEC_PER_SEC 1000000000L
 #define CLOCK_BOOTTIME 7
-#define SCHED_DELAY_SEC 3
+#define SCHED_DELAY_SEC 30
 
 struct heartbeat {
 	struct bpf_timer timer;
@@ -290,254 +347,34 @@ static inline bool is_sched_ext(const struct task_struct *p)
 	return policy == SCHED_EXT;
 }
 
-/*
- * Variables for PCT implementation
- *
- * The following variables are set in the corresponding C program
- * based on user-defined parameters.
- * 
- * @depth: the depth of the concurrency bug to find (i.e., the number of
- * 	   interleavings that would trigger the bug)
- * @seed: the seed for the random number generator
- * @use_pct: flag to indicate whether to use PCT
- * 
- * The following variables are set by the BPF program.
- * 
- * @iterations: the number of times the main thread has exited
- * @max_num_events: the maximum number of enqueue()s that have occurred
- * 		over one iteration. 
- * @num_events: the number of enqueue()s that have occurred
- */
-const volatile u32 depth = 3, seed = 0xdeadbeef;
-const volatile int use_pct = 1;
-u32 iterations, initial_max_num_events, task_count, strata, max_num_events,
-	num_events;
-
-/* xorshift random generator */
-struct xorshift32_state {
-	u32 a;
-} rng_state;
-
-/* The state must be initialized to non-zero */
-u32 xorshift32(struct xorshift32_state *state)
-{
-	u32 x = state->a;
-	x ^= x << 13;
-	x ^= x >> 17;
-	x ^= x << 5;
-	return state->a = x;
-}
-
-/*
- * Map to store the pre-determined priorities for each thread.
- */
-struct {
-	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__type(key, u32);
-	__type(value, u32);
-	__uint(max_entries, MAX_THREADS);
-} pct_priorities SEC(".maps");
-
-/* Swaps two elements in an array */
-static inline void swap(u32 *a, u32 *b)
-{
-	u32 temp = *a;
-	*a = *b;
-	*b = temp;
-}
-
-/* Get strata base for PCT */
-inline s32 get_strata_base()
-{
-	return S32_MAX - ((strata + 2) * MAX_THREADS);
-}
-
-/* 
- * Shuffle the priorities in the pct_priorities map. This function is called
- * during init() of the scheduler, and after each iteration.
- */
-static void shuffle_prios(struct xorshift32_state *state)
-{
-	u32 *prio_value, *value_i, *value_j;
-	u32 index, i, actual_i, actual_j;
-
-	/* Reset the priorities for the new iteration */
-	bpf_for(i, depth, depth + MAX_THREADS)
-	{
-		index = i - depth;
-		prio_value = bpf_map_lookup_elem(&pct_priorities, &index);
-		if (prio_value)
-			*prio_value = get_strata_base() + i;
-	}
-
-	/* Shuffle the resetted priorities using Fisher–Yates algorithm */
-	bpf_for(i, 1, MAX_THREADS)
-	{
-		actual_i = MAX_THREADS - i;
-		actual_j = xorshift32(state) % actual_i;
-		value_i = bpf_map_lookup_elem(&pct_priorities, &actual_i);
-		value_j = bpf_map_lookup_elem(&pct_priorities, &actual_j);
-		if (value_i && value_j) {
-			swap(value_i, value_j);
-		} else {
-			warn("[shuffle_prios] failed to swap values at index: %d and %d\n",
-			     actual_i, actual_j);
-		}
-	}
-}
-
-/* 
- * Assign the priority for a thread based on the pre-determined priorities
- * in the pct_priorities map.
- * 
- * We use % MAX_THREADS to ensure that the index is within the range of the
- * map, and also allow for subsequent processes to get different priorities.
- */
-s32 assign_pct_priority(pid_t pid)
-{
-	u32 index = (u32)pid % MAX_THREADS;
-	s32 *prio_value = bpf_map_lookup_elem(&pct_priorities, &index);
-	if (prio_value)
-		return *prio_value;
-
-	return -1;
-}
-
-/*
- * Update the priority of a thread in the pct_priorities map.
- */
-static void update_pct_priority(pid_t pid, s32 new_prio)
-{
-	u32 index = (u32)pid % MAX_THREADS;
-	u32 *prio_value = bpf_map_lookup_elem(&pct_priorities, &index);
-	if (prio_value)
-		*prio_value = new_prio;
-}
-
-/*
- * Map to store the pre-determined change points for each iteration.
- */
-struct {
-	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__type(key, u32);
-	__type(value, u32);
-	__uint(max_entries,
-	       MAX_THREADS); // should be depth - 1 tho, but this needs a constant
-} pct_change_points SEC(".maps");
-
-/*
- * Choose the change points for the next iteration. This function is called
- * during init() of the scheduler, and after each iteration.
- */
-static void choose_change_points(struct xorshift32_state *state)
-{
-	/* 
-	 * This occurs in a multi-process environment, where the main threads
-	 * of each process exit one after another, with no enqueue()s called
-	 * in between.
-	 */
-	if (max_num_events == 0) {
-		/*
-		 * If no events have occurred for the prev iteration, we don't make
-		 * any assumptions about num_events and set the change points to 1, 
-		 * 2, ... for the next iteration. TODO: this may not be the best approach.
-		 */
-		u32 i, n = depth - 1;
-		bpf_for(i, 0, n)
-		{
-			u32 change_point = i;
-			long status = bpf_map_update_elem(
-				&pct_change_points, &i, &change_point, BPF_ANY);
-			if (status)
-				warn("[choose_change_points] failed to update change_point[%d]: %d\n",
-				     i, change_point);
-		}
-		return;
-	}
-
-	u32 i, n, change_point;
-	long status;
-
-	n = depth - 1;
-	if (n > MAX_THREADS) {
-		scx_bpf_error("[choose_change_points] n: %d, MAX_THREADS: %d\n",
-			      n, MAX_THREADS);
-		return;
-	}
-
-	bpf_for(i, 0, n)
-	{
-		/* NOTE: THERE MAY BE DUPLICATE CHANGE POINTS */
-		change_point = (xorshift32(state) % max_num_events) +
-			       1; // [1, max_num_events]
-		status = bpf_map_update_elem(&pct_change_points, &i,
-					     &change_point, BPF_ANY);
-		if (status)
-			warn("[choose_change_points] failed to update change_point[%d]: %d\n",
-			     i, change_point);
-
-		dbg("[choose_change_points] change_point[%d]: %d\n", i,
-		    change_point);
-	}
-}
-
-/* 
- * Random Walk implementation. @use_random_walk is set in the corresponding
- * C program based on user-defined parameters.
- */
-const volatile int use_random_walk = 0;
-const volatile int use_random_walk_2 = 0;
-
-/*
- * Assign the priority for a thread based on a completely random number.
- */
-static inline s32 assign_rw_priority(pid_t pid)
-{
-	s32 priority = bpf_get_prandom_u32() % MAX_THREADS;
-	return priority;
-}
-
-/* 
- * Combines all implemented scheduling algorithms and chooses
- * the appropriate priority to assign to a thread.
- */
-s32 assign_priority(pid_t pid)
-{
-	if (use_random_walk || use_random_walk_2)
-		return assign_rw_priority(pid);
-
-	if (use_pct)
-		return assign_pct_priority(pid);
-
-	/* should not reach here */
-	scx_bpf_error(
-		"[assign_priority] ERROR: no scheduling algorithm chosen\n");
-	return -2;
-}
-
-/*
- * Callback function to update all priorities in tctx_map for random_walk_2
- */
-static __u64 update_all_prios(struct bpf_map *map, pid_t *key,
-			      struct task_ctx *tctx,
-			      struct tctx_callback_ctx *tcallbackctx)
-{
-	/* Use highest_priority_pid to indicate the pid of the task we have already updated */
-	pid_t pid_to_avoid = tcallbackctx->highest_priority_pid;
-	s32 new_priority;
-	if (*key != pid_to_avoid) {
-		new_priority = assign_priority(*key);
-		bpf_spin_lock(&tctx->lock);
-		tctx->priority = new_priority;
-		bpf_spin_unlock(&tctx->lock);
-	}
-	return 0;
-}
-
 // static __u64 dump_error(struct bpf_map *map, pid_t *key, struct task_ctx *tctx, struct tctx_callback_ctx *tcallbackctx) {
 //     dbg("[dump_error] pid: %d, priority: %d, enqueued: %d\n", *key, tctx->priority, tctx->enqueued);
 //     return 0;
 // }
+
+const volatile int use_pct = 0;
+const volatile int use_random_priority_walk = 0;
+const volatile int use_random_walk = 1;
+
+#include "scx_scheduling_algorithms.c"
+
+
+static u32 get_executor_id(const struct task_struct *p) {
+	char comm[TASK_COMM_LEN];
+	u32 eid;
+	long status;
+
+	status = bpf_probe_read_kernel(&comm, sizeof(comm), p->comm);
+	if (status) {
+		bpf_printk("[get_executor_id] error reading p->comm");
+		return 0;
+	}
+
+	// comm: `syz-executor.X`
+	eid = (u32)comm[13];
+	return eid;
+}
+
 
 /*
  * Task @p becomes ready to run. We update the task's priority and 
@@ -546,8 +383,27 @@ static __u64 update_all_prios(struct bpf_map *map, pid_t *key,
 void BPF_STRUCT_OPS(serialise_enqueue, struct task_struct *p, u64 enq_flags)
 {
 	pid_t pid = p->pid, tgid = p->tgid;
-	dbg("[enqueue] pid: %d, tgid: %d, enq_flags: %d\n", pid, tgid,
-	    enq_flags);
+	u32 eid;
+	struct event *e;
+
+	if (is_sched_ext(p) && (bpf_user_ringbuf_drain(&user_ringbuf, receive_req, NULL, 0) > 0)) {
+		init_scheduling_algo();
+
+		e = bpf_ringbuf_reserve(&kernel_ringbuf, sizeof(*e), 0);
+		if (e) {
+			e->pid = p->pid;
+			bpf_printk("[bpf_ringbuf_submit] pid: %d\n", p->pid);
+			/* send data to user-space for post-processing */
+			bpf_ringbuf_submit(e, 0);
+		}
+	}
+
+	if (is_sched_ext(p)) {
+		eid = get_executor_id(p);
+		// Start scheduling if condition is satisfied
+	} 
+
+	dbg("[enqueue] pid: %d, tgid: %d, enq_flags: %d\n", pid, tgid, enq_flags);
 
 	// READ TASK SLICE
 	// Is there something on the task struct that will tell us we are in a spin lock?
@@ -583,76 +439,7 @@ void BPF_STRUCT_OPS(serialise_enqueue, struct task_struct *p, u64 enq_flags)
 		return;
 	}
 
-	s32 priority = -1;
-
-	/* 
-	 * For PCT, check if a change_point is incurred. If so, update the
-	 * priority of the task.
-	 */
-	if (use_pct) {
-		u32 n = depth - 1, i;
-
-		if (n > MAX_THREADS) {
-			warn("[enqueue] n: %d, MAX_THREADS: %d\n", n,
-			     MAX_THREADS);
-			return;
-		}
-
-		bpf_for(i, 0, n)
-		{
-			u32 *change_point =
-				bpf_map_lookup_elem(&pct_change_points, &i);
-			if (change_point) {
-				// dbg("[enqueue] %d until change \n",
-				//     *change_point - (num_events %
-				// 		     initial_max_num_events));
-				if ((num_events % initial_max_num_events) ==
-				    *change_point) {
-					// If we have observed more events than expected, resume PCT with a
-					// new "strata" -- this allows for threads set to low priority to recover
-					if (num_events >
-					    initial_max_num_events *
-						    (strata + 1)) {
-						strata += 1;
-						dbg("[enqueue] NEW STRATA %d\n",
-						    strata);
-					}
-
-					priority = get_strata_base() + i + 1;
-					update_pct_priority(pid, priority);
-					dbg("[enqueue] UPDATE pid: %d, priority: %d\n",
-					    pid, priority);
-					break;
-				}
-			}
-		}
-	}
-
-	/* Assign priority to the task based on scheduling algo */
-	priority = assign_priority(pid);
-	if (priority < 0) {
-		warn("[enqueue] failed to assign priority for pid: %d, priority: %d\n",
-		     pid, priority);
-		return;
-	}
-
-	/*
-	 * Update the task context.
-	 *
-	 * Since we cannot assure that the task should exist (as new tasks may
-	 * get enqueued), we set should_exist to false.
-	 */
-	tctx_map_insert(pid, priority, true, false);
-
-	if (use_random_walk_2) {
-		/* Update the priorities of the rest of the threads as well */
-		struct tctx_callback_ctx tcallbackctx = {
-			.highest_priority_pid = pid,
-		};
-
-		bpf_for_each_map_elem(&task_ctx_map, update_all_prios,
-				      &tcallbackctx, 0);
-	}
+	update_priorities(pid);
 }
 
 /*
@@ -863,61 +650,15 @@ void BPF_STRUCT_OPS(serialise_exit_task, struct task_struct *p,
 	} else if (!is_root_proc) {
 		dbg("[exit_task] VANILLA PROCESS pid: %d, tgid: %d, ppid: %d\n",
 		    p->pid, p->tgid, ppid);
-
-		/* required for syzkaller */
-		if (use_pct) {
-			__sync_fetch_and_add(&iterations, 1);
-
-			/* 
-			 * Update max_num_events if num_events is larger or somewhat smaller 
-			 * 20 is an arbitrary number chosen. Can be changed.
-			 */
-			if (num_events > max_num_events) {
-				max_num_events = num_events;
-			} else if (num_events < max_num_events - 20) {
-				max_num_events = num_events;
-			}
-
-			dbg("[exit_task] iterations: %d, max_num_events: %d\n",
-			    iterations, max_num_events);
-
-			initial_max_num_events = max_num_events;
-			num_events = 0;
-			strata = 0;
-
-			shuffle_prios(&rng_state);
-			choose_change_points(&rng_state);
-		}
-
 	} else {
 		dbg("[exit_task] ROOT PROCESS pid: %d, tgid: %d, ppid: %d\n",
 		    p->pid, p->tgid, ppid);
-		task_count = 0;
-
-		if (use_pct) {
-			__sync_fetch_and_add(&iterations, 1);
-
-			/* 
-			 * Update max_num_events if num_events is larger or somewhat smaller 
-			 * 20 is an arbitrary number chosen. Can be changed.
-			 */
-			if (num_events > max_num_events) {
-				max_num_events = num_events;
-			} else if (num_events < max_num_events - 20) {
-				max_num_events = num_events;
-			}
-
-			dbg("[exit_task] iterations: %d, max_num_events: %d\n",
-			    iterations, max_num_events);
-
-			initial_max_num_events = max_num_events;
-			num_events = 0;
-			strata = 0;
-
-			shuffle_prios(&rng_state);
-			choose_change_points(&rng_state);
-		}
 	}
+
+	dbg("[exit_task] max_num_events: %d\n", max_num_events);
+
+	initial_max_num_events = max_num_events;
+	num_events = 0;
 }
 
 /*
@@ -935,19 +676,7 @@ s32 BPF_STRUCT_OPS_SLEEPABLE(serialise_init)
 		return status;
 	}
 
-	/* Initialise PCT variables */
-	if (use_pct) {
-		dbg("[init] depth: %d, seed: %d\n", depth, seed);
-		rng_state.a = seed;
-		iterations = 0;
-		max_num_events = 0;
-		strata = 0;
-		initial_max_num_events = depth * 10;
-		task_count = 0;
-		num_events = 0;
-		shuffle_prios(&rng_state);
-		choose_change_points(&rng_state);
-	}
+	rng_state.a = seed;
 
 	return 0;
 }
@@ -982,61 +711,3 @@ struct sched_ext_ops serialise_ops = {
 	.name = "serialise",
 };
 
-/* =================================
- * Hooks
- * ================================= */
-
-#define TRACEPOINT_HOOK(subsystem, fn_name, invoke_num, args...)              \
-	u32 fn_name##_counter = 0;                                            \
-	u32 fn_name##_next_invoke = 10;                                       \
-	SEC("tp/" #subsystem "/" #fn_name)                                    \
-	int fn_name##_hook(args)                                              \
-	{                                                                     \
-		struct task_struct *p =                                       \
-			(struct task_struct *)bpf_get_current_task();         \
-		if (!is_sched_ext(p))                                         \
-			return 0;                                             \
-		__sync_fetch_and_add(&fn_name##_counter, 1);                  \
-		if (fn_name##_counter >= fn_name##_next_invoke) {             \
-			bpf_schedule();                                       \
-			dbg("[hook] " #fn_name ": bpf schedule called: %d\n", \
-			    fn_name##_next_invoke);                           \
-			fn_name##_counter = 0;                                \
-			fn_name##_next_invoke =                               \
-				bpf_get_prandom_u32() % invoke_num + 10;      \
-		}                                                             \
-		return 0;                                                     \
-	}
-
-/*
- * Udelay is called too often to trigger a reschedule every time it is called.
- * Instead, we trigger a reschedule every few random calls to udelay.
- */
-
-u32 udelay_schedule_counter = 0;
-u32 udelay_next_invoke = 10;
-SEC("kprobe/__udelay")
-int BPF_KPROBE(udelay_probe)
-{
-	if (!use_udelay)
-		return 0;
-
-	struct task_struct *p = (struct task_struct *)bpf_get_current_task();
-	if (!is_sched_ext(p))
-		return 0;
-
-	__sync_fetch_and_add(&udelay_schedule_counter, 1);
-	if (udelay_schedule_counter >= udelay_next_invoke) {
-		bpf_schedule();
-		dbg("[udelay_probe] bpf schedule called: %d\n",
-		    udelay_next_invoke);
-		udelay_schedule_counter = 0;
-		udelay_next_invoke = bpf_get_prandom_u32() % 300 + 10;
-	}
-	return 0;
-}
-
-// TRACEPOINT_HOOK(kmem, kmalloc, 30)
-// TRACEPOINT_HOOK(kmem, kfree, 30)
-// TRACEPOINT_HOOK(lock, lock_acquire, 1000)
-// TRACEPOINT_HOOK(lock, lock_release, 1010)
