@@ -9,7 +9,7 @@
 #include <scx/common.bpf.h>
 #include <string.h>
 #include <limits.h>
-#include "scx_simple_signal.h"
+#include "scx_serialise.h"
 
 char _license[] SEC("license") = "GPL";
 
@@ -22,7 +22,7 @@ UEI_DEFINE(uei);
  * and enqueued status of each thread. Adjust this value according to 
  * how many threads you expect the program-under-test to create.
  */
-#define MAX_THREADS 50
+#define MAX_THREADS 200
 
 const volatile u32 seed = 0xdeadbeef;
 
@@ -50,14 +50,19 @@ struct {
 	__uint(max_entries, 256 * 1024);
 } kernel_ringbuf SEC(".maps");
 
+struct sched_job {
+	int pid;
+	int num_call;
+	int num_ready_call;
+	u32 rng_seed;
+};
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, u32);
-	__type(value, struct sched_req);
+	__type(value, struct sched_job);
 	__uint(max_entries, 10);
-} sched_req_map SEC(".maps");
-
+} sched_job_map SEC(".maps");
 
 /*
  * Task context that is used to store the priority and enqueued status of
@@ -106,13 +111,18 @@ static void stat_inc(u32 idx)
 static long receive_req(struct bpf_dynptr *dynptr, void *context)
 {
 	struct sched_req req;
+	struct sched_job job;
 
 	if (bpf_dynptr_read(&req, sizeof(req), dynptr, 0, 0) < 0) {
 		bpf_printk("[receive_req] error reading dynptr data");
 		return 0;
 	}
 
-	if (bpf_map_update_elem(&sched_req_map, &req.pid, &req, BPF_ANY) < 0) {
+	job.num_call = req.num_call;
+	job.pid = req.pid;
+	job.num_ready_call = 0;
+	job.rng_seed = req.rng_seed;
+	if (bpf_map_update_elem(&sched_job_map, &req.pid, &job, BPF_ANY) < 0) {
 		bpf_printk("[receive_req] fail to add sched request");
 	}
 
@@ -154,8 +164,8 @@ const volatile u32 debug = 1;
  * Insert or update the task context of a task in the task context map. 
  * Call this fn when a task is enqueued, dequeued, or dispatched.
  */
-static int tctx_map_insert(pid_t new_pid, s32 modify_prio, bool enqueued,
-			   bool should_exist)
+static int tctx_map_insert(pid_t new_pid, u32 eid, s32 modify_prio,
+			   bool enqueued, bool should_exist)
 {
 	long status;
 	struct task_ctx zero = {}, *tctx;
@@ -190,7 +200,8 @@ static int tctx_map_insert(pid_t new_pid, s32 modify_prio, bool enqueued,
 	/* Update priority and enqueued status */
 	bpf_spin_lock(&tctx->lock);
 	if (modify_prio)
-	tctx->priority = modify_prio;
+		tctx->priority = modify_prio;
+	tctx->eid = eid;
 	tctx->enqueued = enqueued;
 	bpf_spin_unlock(&tctx->lock);
 
@@ -376,6 +387,63 @@ static u32 get_executor_id(const struct task_struct *p) {
 }
 
 
+static long update_priority_callback(struct bpf_map *map, const pid_t *pid, struct task_ctx *tctx, const u32 *eid) {
+	if (tctx->eid == *eid) {
+		bpf_spin_lock(&tctx->lock);
+		update_priorities(pid);
+		bpf_spin_unlock(&tctx->lock);
+	}
+}
+
+/**
+ * handle_sched_ext - Handle scheduling of tasks that are using the extended scheduling algorithm.
+ *
+ * This function is responsible for handling tasks whose policy is SCHED_EXT.
+ * It interacts with both the user-space and kernel-space components and 
+ * manages scheduling decisions based on the task's status in the scheduling job map.
+ *
+ * @p: A pointer to the task_struct representing the task being scheduled.
+ */
+static void handle_sched_ext(struct task_struct *p)
+{
+    if (bpf_user_ringbuf_drain(&user_ringbuf, receive_req, NULL, 0) > 0) {
+        init_scheduling_algo();
+        struct event *e = bpf_ringbuf_reserve(&kernel_ringbuf, sizeof(*e), 0);
+        if (e) {
+            e->pid = p->pid;
+            bpf_printk("[handle_sched_ext] pid: %d\n", p->pid);
+            bpf_ringbuf_submit(e, 0);
+        }
+    }
+
+	struct task_ctx* tctx = bpf_map_lookup_elem(&task_ctx_map, &p->pid);
+	if (tctx) {
+		update_priorities(p->pid);
+		return;
+	}
+
+    u32 eid = get_executor_id(p);
+
+	// Lookup the scheduling job for this executor ID in the job map.
+    struct sched_job *job = bpf_map_lookup_elem(&sched_job_map, &eid);
+    if (!job) {
+        bpf_printk("[handle_sched_ext] job not found\n");
+        return;
+    }
+
+    job->num_ready_call++;
+	// If all the tasks are ready, update task priorities.
+    if (job->num_call == job->num_ready_call) {
+        bpf_for_each_map_elem(&task_ctx_map, update_priority_callback, &eid, 0);
+    } else {
+		// If tasks are not ready yet, update the status and keep waiting.
+        if (bpf_map_update_elem(&sched_job_map, &eid, job, BPF_EXIST) < 0) {
+            bpf_printk("[handle_sched_ext] failed to update job\n");
+        }
+        tctx_map_insert(p->pid, eid, 0, false, false);
+    }
+}
+
 /*
  * Task @p becomes ready to run. We update the task's priority and 
  * the task context to indicate that the task is enqueued.
@@ -383,49 +451,10 @@ static u32 get_executor_id(const struct task_struct *p) {
 void BPF_STRUCT_OPS(serialise_enqueue, struct task_struct *p, u64 enq_flags)
 {
 	pid_t pid = p->pid, tgid = p->tgid;
-	u32 eid;
-	struct event *e;
-
-	if (is_sched_ext(p) && (bpf_user_ringbuf_drain(&user_ringbuf, receive_req, NULL, 0) > 0)) {
-		init_scheduling_algo();
-
-		e = bpf_ringbuf_reserve(&kernel_ringbuf, sizeof(*e), 0);
-		if (e) {
-			e->pid = p->pid;
-			bpf_printk("[bpf_ringbuf_submit] pid: %d\n", p->pid);
-			/* send data to user-space for post-processing */
-			bpf_ringbuf_submit(e, 0);
-		}
-	}
-
-	if (is_sched_ext(p)) {
-		eid = get_executor_id(p);
-		// Start scheduling if condition is satisfied
-	} 
-
-	dbg("[enqueue] pid: %d, tgid: %d, enq_flags: %d\n", pid, tgid, enq_flags);
-
-	// READ TASK SLICE
-	// Is there something on the task struct that will tell us we are in a spin lock?
-	// Need to investigate other fields. Can comment out
-	// struct sched_entity se;
-	// if (p != NULL) {
-	// 	long status = bpf_probe_read_kernel(&se, sizeof(se), &p->se);
-	// 	if (status) {
-	// 		dbg("[enqueue] task_struct read status %ld\n", status);
-	// 	} else {
-	// 		dbg("[enqueue] %d total exec time\n",
-	// 		    se.sum_exec_runtime);
-	// 	}
-	// }
 
 	/* Update statistics */
-	__sync_fetch_and_add(&num_events, 1);
-
-	if (pid == tgid) {
-		stat_inc(0);
-	} else
-		stat_inc(1);
+	 __sync_fetch_and_add(&num_events, 1);
+    stat_inc(pid == tgid ? 0 : 1);
 
 	/*
 	 * Always dispatch per-CPU kthreads on the same CPU, bypassing our scheduler.
@@ -439,7 +468,8 @@ void BPF_STRUCT_OPS(serialise_enqueue, struct task_struct *p, u64 enq_flags)
 		return;
 	}
 
-	update_priorities(pid);
+	if (is_sched_ext(p))
+        handle_sched_ext(p);
 }
 
 /*
