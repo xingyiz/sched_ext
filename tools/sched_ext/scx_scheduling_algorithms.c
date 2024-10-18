@@ -14,16 +14,22 @@ u32 iterations, initial_max_num_events, task_count, max_num_events,
 #include "random-walk.c"
 #include "random-priority.c"
 
-s32 update_priorities(pid_t pid) {
+s32 assign_priority(pid_t pid) {
+	s32 priority;
+	
 	if (use_pct) {
-		return update_priorities_pct(pid);
+		priority = assign_pct_priority(pid);
 	} else if (use_random_walk) {
-		return update_priorities_rw(pid);			
+		priority = assign_rw_priority();		
 	} else if (use_random_priority_walk) {
-		return update_priorities_rp(pid);
+		priority = assign_priorities_rp();
+	}
+	if (priority < 0) {
+		bpf_printk("[enqueue] failed to assign priority for pid: %d, priority: %d\n",pid, priority);
+		return -1;
 	}
 
-	return -1;
+	return priority;
 }
 
 int init_scheduling_algo() {

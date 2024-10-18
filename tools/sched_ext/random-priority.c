@@ -13,7 +13,7 @@ static inline int update_priorities_rp(pid_t pid)
 	dbg("prio new %d", priority);
 
 	if (priority < 0) {
-		warn("[enqueue] failed to assign priority for pid: %d, priority: %d\n",
+		bpf_printk("[enqueue] failed to assign priority for pid: %d, priority: %d\n",
 		     pid, priority);
 		return -1;
 	}
