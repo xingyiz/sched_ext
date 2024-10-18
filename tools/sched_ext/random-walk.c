@@ -38,7 +38,7 @@ static s32 update_priorities_rw(pid_t pid) {
 		s32 priority = assign_rw_priority();
 
 		if (priority < 0) {
-			warn("[enqueue] failed to assign priority for pid: %d, priority: %d\n",
+			bpf_printk("[enqueue] failed to assign priority for pid: %d, priority: %d\n",
 			     pid, priority);
 			return -1;
 		}

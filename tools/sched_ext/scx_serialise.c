@@ -11,7 +11,7 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#include "scx_simple_signal.h"
+#include "scx_serialise.h"
 #include "scx_serialise.bpf.skel.h"
 
 const char help_fmt[] =
