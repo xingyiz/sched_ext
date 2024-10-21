@@ -10,36 +10,30 @@
 u32 iterations, initial_max_num_events, task_count, max_num_events,
 	num_events;
 
-#include "pct.c"
+// #include "pct.c"
 #include "random-walk.c"
-#include "random-priority.c"
+// #include "random-priority.c"
 
-s32 assign_priority(pid_t pid) {
-	s32 priority;
-	
-	if (use_pct) {
-		priority = assign_pct_priority(pid);
-	} else if (use_random_walk) {
-		priority = assign_rw_priority();		
-	} else if (use_random_priority_walk) {
-		priority = assign_priorities_rp();
-	}
-	if (priority < 0) {
-		bpf_printk("[enqueue] failed to assign priority for pid: %d, priority: %d\n",pid, priority);
-		return -1;
-	}
+void update_priorities(u32 eid) {
+	// if (use_pct) {
+	// 	update_priorities_pct(eid);
+	// } else if (use_random_walk) {
+	// 	update_priorities_rw(eid);			
+	// } else if (use_random_priority_walk) {
+	// 	update_priorities_rp(eid);
+	// }
 
-	return priority;
+	update_priorities_rw(eid);
 }
 
 int init_scheduling_algo() {
-	if (use_pct) {
-		return init_pct();
-	} else if (use_random_walk) {
-		return init_rw();			
-	} else if (use_random_priority_walk) {
-		return init_rp();
-	}
-
-	return -1;
+	// if (use_pct) {
+	// 	return init_pct();
+	// } else if (use_random_walk) {
+	// 	return init_rw();			
+	// } else if (use_random_priority_walk) {
+	// 	return init_rp();
+	// }
+	
+	return init_rw();
 }

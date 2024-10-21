@@ -31,7 +31,6 @@ static inline void swap(u32 *a, u32 *b)
 	*b = temp;
 }
 
-
 /* Get strata base for PCT */
 inline s32 get_strata_base()
 {
@@ -184,63 +183,44 @@ s32 init_pct() {
 	return 0;
 }
 
-static s32 update_priorities_pct(pid_t pid) {
+static s32 update_priorities_pct(u32 eid) {
 	s32 priority = -1;
 	/* 
 	 * For PCT, check if a change_point is incurred. If so, update the
 	 * priority of the task.
 	 */
-		u32 n = depth - 1, i;
+	u32 n = depth - 1, i;
 
-		if (n > MAX_THREADS) {
-			warn("[enqueue] n: %d, MAX_THREADS: %d\n", n,
-			     MAX_THREADS);
-			return -1;
-		}
+	if (n > MAX_THREADS) {
+		bpf_printk("[enqueue] n: %d, MAX_THREADS: %d\n", n,
+			   MAX_THREADS);
+		return -1;
+	}
 
-		bpf_for(i, 0, n)
-		{
-			u32 *change_point =
-				bpf_map_lookup_elem(&pct_change_points, &i);
-			if (change_point) {
-				// dbg("[enqueue] %d until change \n",
-				//     *change_point - (num_events %
-				// 		     initial_max_num_events));
-				if ((num_events % initial_max_num_events) ==
-				    *change_point) {
-					// If we have observed more events than expected, resume PCT with a
-					// new "strata" -- this allows for threads set to low priority to recover
-					if (num_events >
-					    initial_max_num_events *
-						    (strata + 1)) {
-						strata += 1;
-						dbg("[enqueue] NEW STRATA %d\n",
-						    strata);
-					}
-
-					priority = get_strata_base() + i + 1;
-					update_pct_priority(pid, priority);
-					dbg("[enqueue] UPDATE pid: %d, priority: %d\n",
-					    pid, priority);
-					break;
+	bpf_for(i, 0, n)
+	{
+		u32 *change_point = bpf_map_lookup_elem(&pct_change_points, &i);
+		if (change_point) {
+			// dbg("[enqueue] %d until change \n",
+			//     *change_point - (num_events %
+			// 		     initial_max_num_events));
+			if ((num_events % initial_max_num_events) ==
+			    *change_point) {
+				// If we have observed more events than expected, resume PCT with a
+				// new "strata" -- this allows for threads set to low priority to recover
+				if (num_events >
+				    initial_max_num_events * (strata + 1)) {
+					strata += 1;
+					dbg("[enqueue] NEW STRATA %d\n",
+					    strata);
 				}
+
+				priority = get_strata_base() + i + 1;
+				update_priority(pid, priority);
+				dbg("[enqueue] UPDATE pid: %d, priority: %d\n",
+				    pid, priority);
+				break;
 			}
 		}
-
-		/* Assign priority to the task based on scheduling algo */
-		priority = assign_pct_priority(pid);
-		if (priority < 0) {
-			warn("[enqueue] failed to assign priority for pid: %d, priority: %d\n",
-			     pid, priority);
-			return -1;
-		}
-
-		/*
-		 * Update the task context.
-		 *
-		 * Since we cannot assure that the task should exist (as new tasks may
-		 * get enqueued), we set should_exist to false.
-		 */
-		tctx_map_insert(pid, priority, true, false);
+	}
 }
-

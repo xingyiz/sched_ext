@@ -78,7 +78,6 @@ static void setup_shm()
 		exit(1);
 	}
 
-	fprintf(stderr, "MEMSET\n");
 	memset(shm_ptr, 0, SHM_SIZE);
 
 	pthread_mutexattr_t mutex_attr;
@@ -123,40 +122,6 @@ static int handle_kernel_reply(void *ctx, void *data, size_t data_sz)
 	return 0;
 }
 
-
-static void read_stats(struct scx_serialise *skel, __u64 *stats)
-{
-	int nr_cpus = libbpf_num_possible_cpus();
-	__u64 cnts[2][nr_cpus];
-	__u32 idx;
-
-	memset(stats, 0, sizeof(stats[0]) * 2);
-
-	for (idx = 0; idx < 2; idx++) {
-		int ret, cpu;
-
-		ret = bpf_map_lookup_elem(bpf_map__fd(skel->maps.stats), &idx,
-					  cnts[idx]);
-		if (ret < 0)
-			continue;
-		for (cpu = 0; cpu < nr_cpus; cpu++)
-			stats[idx] += cnts[idx][cpu];
-	}
-}
-
-void* stats_thread_loop(void* args) {
-	struct scx_serialise* skel = (struct scx_serialise*) args;
-
-	while (!exit_req && !UEI_EXITED(skel, uei)) {
-		__u64 stats[2];
-		read_stats(skel, stats);
-		printf("main=%llu thread=%llu\n", stats[0], stats[1]);
-		fflush(stdout);
-		sleep(1);
-	}
-	return NULL;
-}
-
 int main(int argc, char **argv)
 {
 	struct scx_serialise *skel;
@@ -178,7 +143,7 @@ int main(int argc, char **argv)
 	SCX_OPS_LOAD(skel, serialise_ops, scx_serialise, uei);
 	link = SCX_OPS_ATTACH(skel, serialise_ops);
 
-	fprintf(stderr, "setting up shm\n");
+	fprintf(stderr, "Setting up shm\n");
 	setup_shm();
 
 	rb = ring_buffer__new(bpf_map__fd(skel->maps.kernel_ringbuf),
@@ -210,13 +175,6 @@ int main(int argc, char **argv)
 				skel->rodata->seed = (__u32)v;
 			}
 			break;
-		case 'd':
-			v = strtoul(optarg, NULL, 10);
-			if (v) {
-				printf("depth: %lu\n", v);
-				skel->rodata->depth = (__u32)v;
-			}
-			break;
 		case 'r':
 			v = strtoul(optarg, NULL, 10);
 			if (v) {
@@ -234,32 +192,12 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 'u':
-			v = strtoul(optarg, NULL, 10);
-			if (v) {
-				printf("use udelay: %lu\n", v);
-				skel->rodata->use_udelay = 1;
-			} else {
-				printf("use udelay: 0\n");
-				skel->rodata->use_udelay = 0;
-			}
-			break;
 		case 'h':
 		default:
 			fprintf(stderr, help_fmt, basename(argv[0]));
 			return opt != 'h';
 		}
 	}
-
-
-  pthread_t stats_thread;
-
-  // Create the thread
-  if (pthread_create(&stats_thread, NULL, stats_thread_loop, (void *)skel) != 0) {
-      perror("Failed to create thread");
-      return 1;
-  }
-
 	
 	while (!exit_req && !UEI_EXITED(skel, uei)) {
 		fprintf(stderr, "Acquiring SHM mutex...\n");
@@ -305,7 +243,7 @@ int main(int argc, char **argv)
 	cleanup:
 		// /* Clean up */
 		munmap(shm_ptr, SHM_SIZE);
-	  close(schedShmFd);
+	 	close(schedShmFd);
 
 		ring_buffer__free(rb);
 		user_ring_buffer__free(user_rb);
