@@ -12,9 +12,9 @@ u32 iterations, initial_max_num_events, task_count, max_num_events,
 
 // #include "pct.c"
 #include "random-walk.c"
-// #include "random-priority.c"
+#include "random-priority.c"
 
-void update_priorities(u32 eid) {
+void update_priorities(pid_t pid, u32 eid) {
 	// if (use_pct) {
 	// 	update_priorities_pct(eid);
 	// } else if (use_random_walk) {
@@ -23,7 +23,11 @@ void update_priorities(u32 eid) {
 	// 	update_priorities_rp(eid);
 	// }
 
-	update_priorities_rw(eid);
+	if (use_random_walk) {
+		update_priorities_rw(eid);			
+	} else if (use_random_priority_walk) {
+		update_priorities_rp(pid);
+	}
 }
 
 int init_scheduling_algo() {
@@ -35,5 +39,9 @@ int init_scheduling_algo() {
 	// 	return init_rp();
 	// }
 	
-	return init_rw();
+	if (use_random_walk) {
+		return init_rw();			
+	} else if (use_random_priority_walk) {
+		return init_rp();
+	}
 }

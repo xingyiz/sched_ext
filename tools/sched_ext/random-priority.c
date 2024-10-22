@@ -17,14 +17,10 @@ static inline int update_priorities_rp(pid_t pid)
 		     pid, priority);
 		return -1;
 	}
+	
+	update_priority(pid, priority);
 
-	/*
-	 * Update the task context.
-	 *
-	 * Since we cannot assure that the task should exist (as new tasks may
-	 * get enqueued), we set should_exist to false.
-	 */
-	tctx_map_insert(pid, priority, true, false);
+	return 0;
 }
 
 static inline s32 init_rp() {
