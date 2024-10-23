@@ -25,7 +25,7 @@ void update_priorities(pid_t pid, u32 eid) {
 
 	if (use_random_walk) {
 		update_priorities_rw(eid);			
-	} else if (use_random_priority_walk) {
+	} else if (use_random_priority_walk && pid > 0) {
 		update_priorities_rp(pid);
 	}
 }
@@ -44,4 +44,5 @@ int init_scheduling_algo() {
 	} else if (use_random_priority_walk) {
 		return init_rp();
 	}
+	return 0;
 }
