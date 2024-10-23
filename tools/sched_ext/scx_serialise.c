@@ -58,13 +58,7 @@ static void sigint_handler(int simple)
 //     return (rand() % (max_num - min_num + 1)) + min_num;
 // }
 
-void get_current_time_in_milliseconds() {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
 
-    long long current_time = ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
-	printf("current time: %lld\n", current_time);
-}
 
 static void setup_shm()
 {
@@ -221,7 +215,6 @@ int main(int argc, char **argv)
 			fprintf(stderr, "woke\n");
 		}
 		fprintf(stderr, "Received signal from executor!\n");
-		get_current_time_in_milliseconds();
 
 		if (send_sched_req(user_rb) < 0) {
 			fprintf(stderr, "Failed to send request to user_ring_buffer\n");
@@ -230,7 +223,6 @@ int main(int argc, char **argv)
 			break;
 		}
 		fprintf(stderr, "Sent signal to EBPF prog via ringbuffer\n");
-		get_current_time_in_milliseconds();
 
 		// // keep waiting
 		// err = ring_buffer__poll(rb, -1);

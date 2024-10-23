@@ -10,7 +10,7 @@
 static inline s32 assign_rw_priority()
 {
 	s32 priority = xorshift32(&rng_state) % 2147483647;
-	dbg("prio new %d", priority);
+	// dbg("[assign_rw_priority] prio new %d", priority);
 	return priority;
 }
 
@@ -26,6 +26,7 @@ static int update_all_prios(struct bpf_map *map, pid_t *pid,
 		return 0;
 	
 	s32 priority = assign_rw_priority();
+	// bpf_printk("[update_all_prios] pid: %d, priority: %d", *pid, priority);
 	update_priority(*pid, priority);
 	return 0;
 }
@@ -39,7 +40,7 @@ static s32 update_priorities_rw(u32 eid) {
 	bpf_for_each_map_elem(&task_ctx_map, update_all_prios,
 		&tcallbackctx, 0);
 
-		return 0;
+	return 0;
 }
 
 static inline s32 init_rw() {
