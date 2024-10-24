@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include <unistd.h>
 
+#include "scx_serialise_userspace.h"
 #include "scx_serialise.h"
 #include "scx_serialise.bpf.skel.h"
 
@@ -28,24 +29,9 @@ const char help_fmt[] =
 	"  -u            Use udelay. 0 for no, 1 for yes. (Deprecated) Default: 0.\n";
 
 
-#define SCHED_SHM "/sched_shared_memory"
-#define SHM_SIZE 1024
-
-typedef struct {
-	pthread_mutex_t mutex;
-    pthread_cond_t cond_ready;
-	pthread_cond_t cond_done;
-    int ready;
-	int done;
-
-	int num_call;
-	u32 rng_seed;
-	unsigned long long pid;
-} sched_shm;
-
 static int schedShmFd;
 
-sched_shm *shm_ptr;
+struct sched_shm *shm_ptr;
 
 static volatile int exit_req;
 
@@ -74,7 +60,7 @@ static void setup_shm()
 		exit(1);
 	};
 
-	shm_ptr = (sched_shm *)mmap(0, SHM_SIZE, PROT_READ | PROT_WRITE,
+	shm_ptr = (struct sched_shm *)mmap(0, SHM_SIZE, PROT_READ | PROT_WRITE,
 				    MAP_SHARED, schedShmFd, 0);
 	if (shm_ptr == MAP_FAILED) {
 		fprintf(stderr, "mmap shm_ptr fail");

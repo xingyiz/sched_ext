@@ -314,7 +314,7 @@ static void handle_sched_ext(struct task_struct *p)
 
 	bpf_spin_lock(&job->lock);
 
-    job->num_ready++;
+  job->num_ready++;
 	// If all the tasks are ready, update task priorities.
 	bool all_tasks_ready = (job->num_ready == job->num_alive);
 
