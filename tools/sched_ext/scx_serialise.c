@@ -11,7 +11,7 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#include "scx_simple_signal.h"
+#include "scx_serialise.h"
 #include "scx_serialise.bpf.skel.h"
 
 const char help_fmt[] =
@@ -33,8 +33,11 @@ const char help_fmt[] =
 
 typedef struct {
 	pthread_mutex_t mutex;
-	pthread_cond_t cond;
-	int available;
+    pthread_cond_t cond_ready;
+	pthread_cond_t cond_done;
+    int ready;
+	int done;
+
 	int num_call;
 	u32 rng_seed;
 	unsigned long long pid;
@@ -78,7 +81,6 @@ static void setup_shm()
 		exit(1);
 	}
 
-	fprintf(stderr, "MEMSET\n");
 	memset(shm_ptr, 0, SHM_SIZE);
 
 	pthread_mutexattr_t mutex_attr;
@@ -89,12 +91,14 @@ static void setup_shm()
 	pthread_condattr_t cond_attr;
 	pthread_condattr_init(&cond_attr);
 	pthread_condattr_setpshared(&cond_attr, PTHREAD_PROCESS_SHARED);
-	pthread_cond_init(&shm_ptr->cond, &cond_attr);
+	pthread_cond_init(&shm_ptr->cond_ready, &cond_attr);
+	pthread_cond_init(&shm_ptr->cond_done, &cond_attr);
 
 	pthread_mutexattr_destroy(&mutex_attr);
 	pthread_condattr_destroy(&cond_attr);
 
-	shm_ptr->available = 0;
+	shm_ptr->ready = 0;
+	shm_ptr->done = 0;
 }
 
 static int send_sched_req(struct user_ring_buffer *ringbuf)
@@ -116,54 +120,20 @@ static int send_sched_req(struct user_ring_buffer *ringbuf)
 	return 0;
 }
 
-static int handle_kernel_reply(void *ctx, void *data, size_t data_sz)
-{
-	struct event *e = (struct event*)data;
-	printf("[handle_kernel_event] e->pid: %d\n", e->pid);
-	return 0;
-}
-
-
-static void read_stats(struct scx_serialise *skel, __u64 *stats)
-{
-	int nr_cpus = libbpf_num_possible_cpus();
-	__u64 cnts[2][nr_cpus];
-	__u32 idx;
-
-	memset(stats, 0, sizeof(stats[0]) * 2);
-
-	for (idx = 0; idx < 2; idx++) {
-		int ret, cpu;
-
-		ret = bpf_map_lookup_elem(bpf_map__fd(skel->maps.stats), &idx,
-					  cnts[idx]);
-		if (ret < 0)
-			continue;
-		for (cpu = 0; cpu < nr_cpus; cpu++)
-			stats[idx] += cnts[idx][cpu];
-	}
-}
-
-void* stats_thread_loop(void* args) {
-	struct scx_serialise* skel = (struct scx_serialise*) args;
-
-	while (!exit_req && !UEI_EXITED(skel, uei)) {
-		__u64 stats[2];
-		read_stats(skel, stats);
-		printf("main=%llu thread=%llu\n", stats[0], stats[1]);
-		fflush(stdout);
-		sleep(1);
-	}
-	return NULL;
-}
+// static int handle_kernel_reply(void *ctx, void *data, size_t data_sz)
+// {
+// 	struct event *e = (struct event*)data;
+// 	printf("[handle_kernel_event] e->pid: %d\n", e->pid);
+// 	return 0;
+// }
 
 int main(int argc, char **argv)
 {
 	struct scx_serialise *skel;
 	struct bpf_link *link;
-	struct ring_buffer *rb = NULL;
+	// struct ring_buffer *rb = NULL;
 	struct user_ring_buffer *user_rb = NULL;
-	int err;
+	// int err;
 
 	signal(SIGINT, sigint_handler);
 	signal(SIGTERM, sigint_handler);
@@ -178,16 +148,16 @@ int main(int argc, char **argv)
 	SCX_OPS_LOAD(skel, serialise_ops, scx_serialise, uei);
 	link = SCX_OPS_ATTACH(skel, serialise_ops);
 
-	fprintf(stderr, "setting up shm\n");
+	fprintf(stderr, "Setting up shm\n");
 	setup_shm();
 
-	rb = ring_buffer__new(bpf_map__fd(skel->maps.kernel_ringbuf),
-			      handle_kernel_reply, NULL, NULL);
-	if (!rb) {
-		err = -1;
-		fprintf(stderr, "Failed to create ring buffer\n");
-		goto cleanup;
-	}
+	// rb = ring_buffer__new(bpf_map__fd(skel->maps.kernel_ringbuf),
+	// 		      handle_kernel_reply, NULL, NULL);
+	// if (!rb) {
+	// 	err = -1;
+	// 	fprintf(stderr, "Failed to create ring buffer\n");
+	// 	goto cleanup;
+	// }
 
 	user_rb = user_ring_buffer__new(bpf_map__fd(skel->maps.user_ringbuf),
 					NULL);
@@ -210,13 +180,6 @@ int main(int argc, char **argv)
 				skel->rodata->seed = (__u32)v;
 			}
 			break;
-		case 'd':
-			v = strtoul(optarg, NULL, 10);
-			if (v) {
-				printf("depth: %lu\n", v);
-				skel->rodata->depth = (__u32)v;
-			}
-			break;
 		case 'r':
 			v = strtoul(optarg, NULL, 10);
 			if (v) {
@@ -234,32 +197,12 @@ int main(int argc, char **argv)
 				}
 			}
 			break;
-		case 'u':
-			v = strtoul(optarg, NULL, 10);
-			if (v) {
-				printf("use udelay: %lu\n", v);
-				skel->rodata->use_udelay = 1;
-			} else {
-				printf("use udelay: 0\n");
-				skel->rodata->use_udelay = 0;
-			}
-			break;
 		case 'h':
 		default:
 			fprintf(stderr, help_fmt, basename(argv[0]));
 			return opt != 'h';
 		}
 	}
-
-
-  pthread_t stats_thread;
-
-  // Create the thread
-  if (pthread_create(&stats_thread, NULL, stats_thread_loop, (void *)skel) != 0) {
-      perror("Failed to create thread");
-      return 1;
-  }
-
 	
 	while (!exit_req && !UEI_EXITED(skel, uei)) {
 		fprintf(stderr, "Acquiring SHM mutex...\n");
@@ -267,8 +210,8 @@ int main(int argc, char **argv)
 
 		fprintf(stderr, "Waiting for signal from executor\n");
 		// wait for the request from executor
-		while (!shm_ptr->available) {
-			pthread_cond_wait(&shm_ptr->cond, &shm_ptr->mutex);
+		while (!shm_ptr->ready) {
+			pthread_cond_wait(&shm_ptr->cond_ready, &shm_ptr->mutex);
 			fprintf(stderr, "woke\n");
 		}
 		fprintf(stderr, "Received signal from executor!\n");
@@ -281,23 +224,25 @@ int main(int argc, char **argv)
 		}
 		fprintf(stderr, "Sent signal to EBPF prog via ringbuffer\n");
 
-		// keep waiting
-		err = ring_buffer__poll(rb, -1);
-		if (err == -EINTR) {
-			err = 0;
-			pthread_mutex_unlock(&shm_ptr->mutex);
-			fprintf(stderr, "Relinquished SHM mutex...\n");
-			break;
-		}
-		if (err < 0) {
-			printf("Error polling ring buffer: %d\n", err);
-			pthread_mutex_unlock(&shm_ptr->mutex);
-			fprintf(stderr, "Relinquished SHM mutex...\n");
-			break;
-		}
+		// // keep waiting
+		// err = ring_buffer__poll(rb, -1);
+		// if (err == -EINTR) {
+		// 	err = 0;
+		// 	pthread_mutex_unlock(&shm_ptr->mutex);
+		// 	fprintf(stderr, "Relinquished SHM mutex...\n");
+		// 	break;
+		// }
+		// if (err < 0) {
+		// 	printf("Error polling ring buffer: %d\n", err);
+		// 	pthread_mutex_unlock(&shm_ptr->mutex);
+		// 	fprintf(stderr, "Relinquished SHM mutex...\n");
+		// 	break;
+		// }
 
-		shm_ptr->available = 0;
+		shm_ptr->ready = 0;
+		shm_ptr->done = 1;
 
+		pthread_cond_signal(&shm_ptr->cond_done);
 		pthread_mutex_unlock(&shm_ptr->mutex);
 		fprintf(stderr, "Relinquished SHM mutex...\n");
 	}
@@ -305,9 +250,9 @@ int main(int argc, char **argv)
 	cleanup:
 		// /* Clean up */
 		munmap(shm_ptr, SHM_SIZE);
-	  close(schedShmFd);
+	 	close(schedShmFd);
 
-		ring_buffer__free(rb);
+		// ring_buffer__free(rb);
 		user_ring_buffer__free(user_rb);
 
 		bpf_link__destroy(link);

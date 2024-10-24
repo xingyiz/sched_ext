@@ -10,21 +10,17 @@
 static inline int update_priorities_rp(pid_t pid)
 {
 	s32 priority = xorshift32(&rng_state) % 2147483647;
-	dbg("prio new %d", priority);
+	dbg("[update_priorities_rp] prio new %d", priority);
 
 	if (priority < 0) {
-		warn("[enqueue] failed to assign priority for pid: %d, priority: %d\n",
+		bpf_printk("[enqueue] failed to assign priority for pid: %d, priority: %d\n",
 		     pid, priority);
 		return -1;
 	}
+	
+	update_priority(pid, priority);
 
-	/*
-	 * Update the task context.
-	 *
-	 * Since we cannot assure that the task should exist (as new tasks may
-	 * get enqueued), we set should_exist to false.
-	 */
-	tctx_map_insert(pid, priority, true, false);
+	return 0;
 }
 
 static inline s32 init_rp() {
