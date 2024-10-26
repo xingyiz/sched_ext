@@ -15,6 +15,22 @@ char _license[] SEC("license") = "GPL";
 
 UEI_DEFINE(uei);
 
+#define warn(fmt, args...)                     \
+	do {                                         \
+			bpf_printk("[WARNING]: " fmt, ##args);   \
+	} while (0)
+
+#define dbg(fmt, args...)                      \
+	do {                                         \
+		if (debug)                                 \
+			bpf_printk(fmt, ##args);                 \
+	} while (0)
+
+#define trace(fmt, args...)                    \
+	do {                                         \
+		if (debug > 1)                             \
+			bpf_printk(fmt, ##args);                 \
+	} while (0)
 /*
  * The maximum number of threads that is supported by the scheduler.
  *
@@ -25,6 +41,13 @@ UEI_DEFINE(uei);
 #define MAX_THREADS 200
 
 const volatile u32 seed = 0xdeadbeef;
+
+const volatile bool schedule_all_sched_ext_policy_tasks = true;
+
+#define  SINGLE_GROUP 1
+#define  SYZ_EID  2
+
+const volatile u32 sched_group_strategy = SYZ_EID; 
 
 /* xorshift random generator */
 struct xorshift32_state rng_state;
@@ -240,21 +263,29 @@ static void update_priority(pid_t pid, s32 priority) {
 #include "scx_scheduling_algorithms.c"
 
 
-static u32 identify_group(const struct task_struct *p) {
-	char comm[TASK_COMM_LEN] = {};
-	u32 eid = 0;
-	long status;
+static s32 identify_group(const struct task_struct *p) {
 
-	status = bpf_probe_read_kernel(comm, sizeof(comm), p->comm);
-	if (status) {
-		bpf_printk("[identify_group] error reading p->comm");
+	if (sched_group_strategy == SINGLE_GROUP) {
+		return 0;
+	} else if (sched_group_strategy == SYZ_EID) {
+		char comm[TASK_COMM_LEN] = {};
+		u32 eid = 0;
+		long status;
+
+		status = bpf_probe_read_kernel(comm, sizeof(comm), p->comm);
+		if (status) {
+			bpf_printk("[identify_group] error reading p->comm");
+			return 0;
+		}
+
+		// comm: `syz-executor.X`
+		if (comm[13] != '\0')
+			eid = (u32)comm[13]-48;
+		return eid;
+	} else {
+		warn("Unknown sched group handling strategy");
 		return 0;
 	}
-
-	// comm: `syz-executor.X`
-	if (comm[13] != '\0')
-		eid = (u32)comm[13]-48;
-	return eid;
 }
 
 
@@ -491,12 +522,12 @@ void BPF_STRUCT_OPS(serialise_running, struct task_struct *p)
         //     bpf_ringbuf_submit(e, 0);
         // }
 		bpf_printk("[serialise_running] receive req");
-    }
+	}
 
 	if (!is_sched_ext(p) || is_kthread(p))
 		return;
 
-	bpf_printk("[running] pid: %d\n", p->pid);
+	trace("[running] pid: %d\n", p->pid);
 }
 
 void BPF_STRUCT_OPS(serialise_stopping, struct task_struct *p, bool runnable)
@@ -504,7 +535,7 @@ void BPF_STRUCT_OPS(serialise_stopping, struct task_struct *p, bool runnable)
 	if (!is_sched_ext(p) || is_kthread(p))
 		return;
 
-	bpf_printk("[stopping] pid: %d\n", p->pid);
+	trace("[stopping] pid: %d\n", p->pid);
 }
 
 /*
@@ -544,7 +575,7 @@ void BPF_STRUCT_OPS(serialise_quiescent, struct task_struct *p, u64 deq_flags)
 
 	bpf_printk("[quiescent] num_alive: %d, num_ready: %d", num_alive, num_ready);
 
-	if (num_alive == 0)
+	if (num_alive == 0 && job->num_total != 0)
 		bpf_map_delete_elem(&sched_job_map, &tctx->eid);
 
 	if (num_alive && num_alive == num_ready) {
