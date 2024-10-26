@@ -41,6 +41,7 @@ const volatile int use_random_walk = 1;
 			bpf_printk(fmt, ##args); \
 	} while (0)
 
+
 /* Communication channels to/from user-space */
 struct {
 	__uint(type, BPF_MAP_TYPE_USER_RINGBUF);
@@ -599,7 +600,6 @@ struct sched_ext_ops serialise_ops = {
 	.exit_task = (void *)serialise_exit_task,
 	.init = (void *)serialise_init,
 	.exit = (void *)serialise_exit,
-	.flags = SCX_OPS_ENQ_LAST | SCX_OPS_SWITCH_PARTIAL,
 	.timeout_ms = 30000,
 	.name = "serialise",
 };

@@ -117,7 +117,7 @@ static int send_sched_req(struct user_ring_buffer *ringbuf)
 static int handle_kernel_reply(void *ctx, void *data, size_t data_sz)
 {
 	struct event *e = (struct event*)data;
-
+	
 	printf("[handle_kernel_event] e->pid: %d\n", e->pid);
 	return 0;
 }
@@ -137,7 +137,7 @@ int main(int argc, char **argv)
 	struct bpf_link *link;
 	struct ring_buffer *rb = NULL;
 	struct user_ring_buffer *user_rb = NULL;
-	u32 opt;
+	__u32 opt;
 	int status;
 
 	signal(SIGINT, sigint_handler);
@@ -151,7 +151,7 @@ int main(int argc, char **argv)
 	SCX_BUG_ON(!skel, "Failed to open skel");
 
 	SCX_OPS_LOAD(skel, serialise_ops, scx_serialise, uei);
-	link = SCX_OPS_ATTACH(skel, serialise_ops);
+	link = SCX_OPS_ATTACH(skel, serialise_ops, scx_serialise);
 
 	fprintf(stderr, "Setting up shm\n");
 	setup_shm();
