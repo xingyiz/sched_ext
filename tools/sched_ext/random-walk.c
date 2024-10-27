@@ -22,7 +22,7 @@ static int update_all_prios(struct bpf_map *map, pid_t *pid,
 			      struct task_ctx *tctx,
 			      struct tctx_callback_ctx *tcallbackctx)
 {
-	if (tctx->eid != tcallbackctx->eid)
+	if (tctx->eid != tcallbackctx->eid || !tctx->enqueued)
 		return 0;
 	
 	s32 priority = assign_rw_priority();
