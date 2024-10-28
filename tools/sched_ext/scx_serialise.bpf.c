@@ -45,7 +45,7 @@ const volatile u32 seed = 0xdeadbeef;
 #define  SINGLE_JOB 1
 #define  JOB_PER_SYZ_EID  2
 
-const volatile u32 sched_job_strategy = SINGLE_JOB; 
+const volatile u32 sched_job_strategy = JOB_PER_SYZ_EID; 
 
 /* xorshift random generator */
 struct xorshift32_state rng_state;
