@@ -3,10 +3,13 @@
 #ifndef __BOOTSTRAP_H
 #define __BOOTSTRAP_H
 
+
+
 struct event {
 	int pid;
 };
 
+// For communication from scx_serialise userspace to scx_serialise.bpf
 struct sched_req {
 	int pid;
   int num_call;
