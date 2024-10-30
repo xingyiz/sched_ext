@@ -76,6 +76,7 @@ struct sched_job {
 	int num_expected;
 	int num_ready;
 	int num_alive;
+	u32 num_events;
 	u32 rng_seed;
 	struct bpf_spin_lock lock;
 };
@@ -154,6 +155,7 @@ static long receive_req(struct bpf_dynptr *dynptr, void *context)
 	job.pid = req.pid;
 	job.num_ready = 0;
 	job.num_alive = 0;
+	job.num_events = 0;
 	job.rng_seed = req.rng_seed;
 	if (bpf_map_update_elem(&sched_job_map, &req.pid, &job, BPF_ANY) < 0) {
 		bpf_printk("[receive_req] fail to add sched request");
@@ -281,9 +283,12 @@ static s32 identify_group(const struct task_struct *p) {
 
 static inline bool can_dispatch(struct sched_job* job)
 {
+	if (JOB_PER_SYZ_EID == sched_job_strategy && job->num_expected > 0 && job->num_ready == job->num_expected) {
+		job->num_expected = 0;
+	}
 	// If all the tasks are ready, update task priorities.
 	return (job->num_ready == job->num_alive && 
-          (!(sched_job_strategy == JOB_PER_SYZ_EID) || job->num_ready == job->num_expected));
+          (!(sched_job_strategy == JOB_PER_SYZ_EID) || job->num_expected == 0));
 }
 
 /* 
@@ -352,6 +357,7 @@ static void handle_sched_ext(struct task_struct *p)
 	bpf_printk("[handle_sched_ext] ready/alive: %d / %d\n", job->num_ready + 1, job->num_alive);
 
 	bpf_spin_lock(&job->lock);
+	job->num_events++;
   job->num_ready++;
 	if (can_dispatch(job)) {
 		// HACK to avoid TOCTOU issues
@@ -528,7 +534,7 @@ void BPF_STRUCT_OPS(serialise_runnable, struct task_struct *p, u64 enq_flags)
 	if (!is_sched_ext(p))
 		return;
 
-	bpf_printk("[runnable] pid: %d\n", p->pid);
+	trace("[runnable] pid: %d\n", p->pid);
 }
 
 void BPF_STRUCT_OPS(serialise_running, struct task_struct *p)
@@ -579,7 +585,7 @@ void BPF_STRUCT_OPS(serialise_quiescent, struct task_struct *p, u64 deq_flags)
 		
 	struct sched_job* job = bpf_map_lookup_elem(&sched_job_map, &tctx->eid);
 	if (!job) {
-		bpf_printk("[quiescent] sched_job %d not found\n", tctx->eid);
+		warn("[quiescent] sched_job %d not found\n", tctx->eid);
 		return;
 	}
 
@@ -595,7 +601,7 @@ void BPF_STRUCT_OPS(serialise_quiescent, struct task_struct *p, u64 deq_flags)
 	bpf_printk("[quiescent] num_alive: %d, num_ready: %d", num_alive, num_ready);
 
 	if (num_alive == 0 && job->num_expected != 0) {
-		bpf_printk("[quiescent] delete job");
+		bpf_printk("[quiescent] delete job %u: %u events", tctx->eid, job->num_events);
 		bpf_map_delete_elem(&sched_job_map, &tctx->eid);
 	}
 
@@ -638,13 +644,25 @@ void BPF_STRUCT_OPS(serialise_exit_task, struct task_struct *p,
 	if (!is_sched_ext(p))
 		return;
 
+	s32 eid = identify_group(p);
+
+	struct sched_job* job = bpf_map_lookup_elem(&sched_job_map, &eid);
+	if (!job) {
+		warn("[exit_task] sched_job %d not found\n", eid);
+		return;
+	}
+
+	bpf_printk("[exit_task] job %u: %u events", eid, job->num_events);
+
 	pid_t pid = p->pid;
 	bpf_printk("[exit_task] pid: %d", pid);
 	struct task_ctx* tctx = bpf_map_lookup_elem(&task_ctx_map, &pid);
 	if (!tctx) {
-		bpf_printk("[exit_task] task %d not found\n", p->pid);
+		warn("[exit_task] task %d not found\n", p->pid);
 		return;
 	}
+
+
 
 	// We could delete empty jobs here, but I think there is no need;
 	// For very long runs with a job e.g. per process, this could become 
